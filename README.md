@@ -1,0 +1,2 @@
+# ngsejdun.bbs
+てす
