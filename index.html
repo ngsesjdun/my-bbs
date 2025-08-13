@@ -4,82 +4,116 @@
 <meta charset="UTF-8">
 <title>おんJ風掲示板</title>
 <style>
-  body { font-family: sans-serif; background: #f5f5f5; }
-  #posts { max-width: 600px; margin: auto; background: white; padding: 10px; border-radius: 5px; height: 70vh; overflow-y: auto; }
-  .post { border-bottom: 1px solid #ddd; padding: 5px; }
-  .post:last-child { border-bottom: none; }
-  .name { font-weight: bold; color: #0077cc; }
-  .time { font-size: 0.8em; color: gray; }
-  .number { color: red; font-weight: bold; margin-right: 5px; }
-  #input-area { max-width:600px; margin:auto; margin-top:10px; }
-  #input-area input, #input-area button { padding:5px; font-size:1em; }
-  #input-area input { margin-right:5px; }
+body { font-family: sans-serif; background: #f5f5f5; }
+#threads, #posts { max-width: 600px; margin: auto; background: white; padding: 10px; border-radius: 5px; margin-top: 10px; overflow-y: auto; }
+#threads { height: 20vh; }
+#posts { height: 50vh; }
+.thread, .post { border-bottom: 1px solid #ddd; padding: 5px; cursor: pointer; }
+.thread:last-child, .post:last-child { border-bottom: none; }
+.name { font-weight: bold; color: #0077cc; }
+.time { font-size: 0.8em; color: gray; }
+.number { color: red; font-weight: bold; margin-right: 5px; }
+#thread-input, #post-input { max-width: 600px; margin: auto; margin-top: 10px; }
+#thread-input input, #post-input input, #thread-input button, #post-input button { padding:5px; font-size:1em; }
+#thread-input input, #post-input input { margin-right:5px; }
 </style>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-<h1 style="text-align:center;">おんJテスト</h1>
+<h1 style="text-align:center;">おんJ風掲示板</h1>
 
-<div id="posts"></div>
+<div id="thread-input">
+  <input type="text" id="new-thread-title" placeholder="スレッドタイトル" style="width:70%;">
+  <button id="create-thread">スレ作成</button>
+</div>
 
-<div id="input-area">
+<div id="threads"></div>
+
+<div id="post-input" style="display:none;">
   <input type="text" id="name" placeholder="名前" style="width:25%;">
   <input type="text" id="message" placeholder="本文" style="width:55%;">
   <button id="send">書き込む</button>
 </div>
 
+<div id="posts"></div>
+
 <script>
 const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8";
+const SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY_HERE";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+let currentThreadId = null;
+
+const threadsDiv = document.getElementById("threads");
 const postsDiv = document.getElementById("posts");
+const newThreadInput = document.getElementById("new-thread-title");
+const createThreadBtn = document.getElementById("create-thread");
 const nameInput = document.getElementById("name");
 const messageInput = document.getElementById("message");
 const sendBtn = document.getElementById("send");
 
-async function loadPosts() {
-  const { data, error } = await supabase
-    .from("posts")
-    .select("*")
-    .order("created_at", { ascending: true });
+// スレッド一覧読み込み
+async function loadThreads() {
+  const { data, error } = await supabase.from("threads").select("*").order("created_at", { ascending: true });
   if (error) { console.error(error); return; }
+  threadsDiv.innerHTML = "";
+  data.forEach(thread => {
+    const div = document.createElement("div");
+    div.className = "thread";
+    div.textContent = thread.title;
+    div.onclick = () => { currentThreadId = thread.id; loadPosts(); document.getElementById("post-input").style.display="block"; };
+    threadsDiv.appendChild(div);
+  });
+}
 
+// スレッド作成
+createThreadBtn.onclick = async () => {
+  const title = newThreadInput.value.trim();
+  if (!title) return;
+  const { error } = await supabase.from("threads").insert([{ title }]);
+  if (error) { console.error(error); alert("スレッド作成失敗"); } 
+  else { newThreadInput.value=""; loadThreads(); }
+};
+
+// 投稿読み込み
+async function loadPosts() {
+  if (!currentThreadId) return;
+  const { data, error } = await supabase.from("posts").select("*").eq("thread_id", currentThreadId).order("created_at", { ascending: true });
+  if (error) { console.error(error); return; }
   postsDiv.innerHTML = "";
   data.forEach((post, index) => {
+    const localTime = post.created_at ? new Date(post.created_at + 'Z').toLocaleString('ja-JP', { hour12: false }) : "";
     const div = document.createElement("div");
     div.className = "post";
     div.innerHTML = `<span class="number">${index+1}</span>
                      <span class="name">${post.name || "名無し"}</span>：${post.message || ""}<br>
-                     <span class="time">${post.created_at ? new Date(post.created_at).toLocaleString() : ""}</span>`;
+                     <span class="time">${localTime}</span>`;
     postsDiv.appendChild(div);
   });
   postsDiv.scrollTop = postsDiv.scrollHeight;
 }
 
+// 投稿送信
 sendBtn.onclick = async () => {
+  if (!currentThreadId) return;
   const name = nameInput.value.trim() || "名無し";
   const message = messageInput.value.trim();
   if (!message) return;
-  const { error } = await supabase.from("posts").insert([{ name, message }]);
-  if (error) {
-    console.error(error);
-    alert("投稿に失敗しました。コンソールを確認してください。");
-  } else {
-    messageInput.value = "";
-  }
+  const { error } = await supabase.from("posts").insert([{ name, message, thread_id: currentThreadId }]);
+  if (error) { console.error(error); alert("投稿失敗"); }
+  else { messageInput.value=""; loadPosts(); }
 };
 
 // リアルタイム購読
 supabase
   .channel('realtime-posts')
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, payload => {
-    loadPosts();
+    if (payload.new.thread_id === currentThreadId) loadPosts();
   })
   .subscribe();
 
-loadPosts();
+loadThreads();
 </script>
 
 </body>
