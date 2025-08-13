@@ -5,23 +5,27 @@
 <title>おんJ風掲示板</title>
 <style>
   body { font-family: sans-serif; background: #f5f5f5; }
-  #posts { max-width: 600px; margin: auto; background: white; padding: 10px; border-radius: 5px; }
+  #posts { max-width: 600px; margin: auto; background: white; padding: 10px; border-radius: 5px; height: 70vh; overflow-y: auto; }
   .post { border-bottom: 1px solid #ddd; padding: 5px; }
   .post:last-child { border-bottom: none; }
   .name { font-weight: bold; color: #0077cc; }
   .time { font-size: 0.8em; color: gray; }
   .number { color: red; font-weight: bold; margin-right: 5px; }
+  #input-area { max-width:600px; margin:auto; margin-top:10px; }
+  #input-area input, #input-area button { padding:5px; font-size:1em; }
+  #input-area input { margin-right:5px; }
 </style>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-<h1 style="text-align:center;">掲示板</h1>
+<h1 style="text-align:center;">おんJテスト</h1>
+
 <div id="posts"></div>
 
-<div style="max-width:600px; margin:auto; margin-top:20px;">
-  <input type="text" id="name" placeholder="名前" style="width:30%;">
-  <input type="text" id="message" placeholder="本文" style="width:50%;">
+<div id="input-area">
+  <input type="text" id="name" placeholder="名前" style="width:25%;">
+  <input type="text" id="message" placeholder="本文" style="width:55%;">
   <button id="send">書き込む</button>
 </div>
 
@@ -39,7 +43,7 @@ async function loadPosts() {
   const { data, error } = await supabase
     .from("posts")
     .select("*")
-    .order("created_at", { ascending: true }); 
+    .order("created_at", { ascending: true });
   if (error) { console.error(error); return; }
 
   postsDiv.innerHTML = "";
@@ -59,11 +63,15 @@ sendBtn.onclick = async () => {
   const message = messageInput.value.trim();
   if (!message) return;
   const { error } = await supabase.from("posts").insert([{ name, message }]);
-  if (error) { console.error(error); }
-  else { messageInput.value = ""; }
+  if (error) {
+    console.error(error);
+    alert("投稿に失敗しました。コンソールを確認してください。");
+  } else {
+    messageInput.value = "";
+  }
 };
 
-// リアルタイム購読で即反映
+// リアルタイム購読
 supabase
   .channel('realtime-posts')
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, payload => {
@@ -76,4 +84,3 @@ loadPosts();
 
 </body>
 </html>
-
