@@ -23,11 +23,12 @@ button { cursor:pointer;}
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js'
 
+// --- ここからSupabase接続情報 ---
 const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co"
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8"
-
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 let currentThreadId = null
+// --- ここまで ---
 
 const threadsDiv = document.getElementById('threads')
 const postsDiv = document.getElementById('posts')
