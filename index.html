@@ -1,11 +1,84 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>おんJ風掲示板</title>
+<meta charset="UTF-8">
+<title>おんJ風掲示板</title>
+<style>
+  body { font-family: sans-serif; background: #f5f5f5; }
+  #posts { max-width: 600px; margin: auto; background: white; padding: 10px; border-radius: 5px; }
+  .post { border-bottom: 1px solid #ddd; padding: 5px; }
+  .post:last-child { border-bottom: none; }
+  .name { font-weight: bold; color: #0077cc; }
+  .time { font-size: 0.8em; color: gray; }
+  .number { color: red; font-weight: bold; margin-right: 5px; }
+</style>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <h1>（テスト）</h1>
-  <p>これはGitHub Pagesで表示されてます！</p>
+
+<h1 style="text-align:center;">おんJ風掲示板</h1>
+<div id="posts"></div>
+
+<div style="max-width:600px; margin:auto; margin-top:20px;">
+  <input type="text" id="name" placeholder="名前" style="width:30%;">
+  <input type="text" id="message" placeholder="本文" style="width:50%;">
+  <button id="send">書き込む</button>
+</div>
+
+<script>
+const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const postsDiv = document.getElementById("posts");
+const nameInput = document.getElementById("name");
+const messageInput = document.getElementById("message");
+const sendBtn = document.getElementById("send");
+
+async function loadPosts() {
+  const { data, error } = await supabase
+    .from("posts")
+    .select("*")
+    .order("created_at", { ascending: true });
+  if (error) {
+    console.error(error);
+    return;
+  }
+  postsDiv.innerHTML = "";
+  data.forEach((post, index) => {
+    const div = document.createElement("div");
+    div.className = "post";
+    div.innerHTML = `<span class="number">${index + 1}</span>
+                     <span class="name">${post.name || "名無し"}</span>：${post.message}<br>
+                     <span class="time">${new Date(post.created_at).toLocaleString()}</span>`;
+    postsDiv.appendChild(div);
+  });
+  // 一番下までスクロール
+  postsDiv.scrollTop = postsDiv.scrollHeight;
+}
+
+sendBtn.onclick = async () => {
+  const name = nameInput.value.trim() || "名無し";
+  const message = messageInput.value.trim();
+  if (!message) return;
+  const { error } = await supabase.from("posts").insert([{ name, message }]);
+  if (error) {
+    console.error(error);
+  } else {
+    messageInput.value = "";
+  }
+};
+
+// リアルタイム購読で即反映
+supabase
+  .channel('realtime-posts')
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, payload => {
+    loadPosts();
+  })
+  .subscribe();
+
+loadPosts();
+</script>
+
 </body>
 </html>
