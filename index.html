@@ -1,113 +1,42 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>おんJ風掲示板</title>
-<style>
-body { font-family: sans-serif; background: #f5f5f5; }
-.container { max-width: 800px; margin: auto; background: white; padding: 1em; }
-.thread, .post { border-bottom: 1px solid #ccc; padding: 0.5em; }
-a { text-decoration: none; color: blue; }
-</style>
+  <meta charset="UTF-8">
+  <title>スレ一覧</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
-<div class="container">
-  <h1>おんJ風掲示板</h1>
+  <h1>スレ一覧　ちんこの呼吸板の方　なんJ作成</h1>
+  <div id="threads"></div>
 
-  <div id="thread-list"></div>
+  <script>
+    const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8";
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  <h2>スレッド作成</h2>
-  <input id="thread-title" placeholder="スレタイ">
-  <button onclick="createThread()">作成</button>
+    async function loadThreads() {
+      const { data, error } = await supabase
+        .from('threads')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-  <div id="thread-view" style="display:none;">
-    <h2 id="thread-title-view"></h2>
-    <div id="post-list"></div>
-    <input id="post-content" placeholder="レス内容">
-    <button onclick="createPost()">レスする</button>
-  </div>
-</div>
+      if (error) {
+        console.error(error);
+        return;
+      }
 
-<script type="module">
-import { createClient } from 'https://esm.sh/@supabase/supabase-js'
+      const container = document.getElementById('threads');
+      container.innerHTML = '';
+      data.forEach(thread => {
+        const link = document.createElement('a');
+        link.href = '#'; // ここは後でスレ詳細表示に切り替える
+        link.textContent = thread.title;
+        link.style.display = 'block';
+        container.appendChild(link);
+      });
+    }
 
-const SUPABASE_URL = "YOUR_SUPABASE_URL"
-const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY"
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-
-let currentThreadId = null
-
-async function loadThreads() {
-  const { data } = await supabase.from('threads').select('*').order('created_at', { ascending: false })
-  const list = document.getElementById('thread-list')
-  list.innerHTML = ''
-  data.forEach(t => {
-    const div = document.createElement('div')
-    div.className = 'thread'
-    div.innerHTML = `<a href="#" onclick="openThread('${t.id}', '${t.title}')">${t.title}</a>`
-    list.appendChild(div)
-  })
-}
-
-async function createThread() {
-  const title = document.getElementById('thread-title').value
-  if (!title) return
-  await supabase.from('threads').insert({ title })
-  document.getElementById('thread-title').value = ''
-}
-
-async function openThread(id, title) {
-  currentThreadId = id
-  document.getElementById('thread-view').style.display = 'block'
-  document.getElementById('thread-title-view').textContent = title
-  loadPosts(id)
-  subscribePosts(id)
-}
-
-async function loadPosts(threadId) {
-  const { data } = await supabase.from('posts').select('*').eq('thread_id', threadId).order('created_at', { ascending: true })
-  renderPosts(data)
-}
-
-function renderPosts(posts) {
-  const list = document.getElementById('post-list')
-  list.innerHTML = ''
-  posts.forEach(p => {
-    const div = document.createElement('div')
-    div.className = 'post'
-    div.textContent = p.content
-    list.appendChild(div)
-  })
-}
-
-async function createPost() {
-  const content = document.getElementById('post-content').value
-  if (!content) return
-  await supabase.from('posts').insert({ thread_id: currentThreadId, content })
-  document.getElementById('post-content').value = ''
-}
-
-function subscribePosts(threadId) {
-  supabase.channel('posts-channel')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts', filter: `thread_id=eq.${threadId}` }, payload => {
-      const newPost = payload.new
-      const div = document.createElement('div')
-      div.className = 'post'
-      div.textContent = newPost.content
-      document.getElementById('post-list').appendChild(div)
-    })
-    .subscribe()
-}
-
-loadThreads()
-
-// スレッドのリアルタイム更新
-supabase.channel('threads-channel')
-  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'threads' }, payload => {
-    loadThreads()
-  })
-  .subscribe()
-
-</script>
+    loadThreads();
+  </script>
 </body>
 </html>
