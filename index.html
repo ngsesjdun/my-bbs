@@ -2,30 +2,37 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>簡易おんJ</title>
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <title>おんJ風掲示板</title>
   <style>
-    body { font-family: sans-serif; max-width: 600px; margin: auto; padding: 1em; }
-    h2 { cursor: pointer; color: blue; text-decoration: underline; }
-    .thread { margin-bottom: 1em; }
-    .post { border-bottom: 1px solid #ccc; padding: 0.5em 0; }
-    form { margin-top: 1em; }
-    textarea { width: 100%; height: 4em; }
-    button { margin-top: 0.5em; }
+    body { font-family: sans-serif; margin: 20px; }
+    h1 { color: #333; }
+    .thread { margin-bottom: 10px; }
+    .post { padding: 5px; border-bottom: 1px solid #ccc; }
+    .link { color: blue; text-decoration: underline; cursor: pointer; }
   </style>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <h1>スレ一覧</h1>
-  <div id="thread-list"></div>
+  <div id="threadList"></div>
 
-  <div id="thread-view" style="display:none;">
-    <h2 id="thread-title"></h2>
-    <div id="post-list"></div>
-    <form id="post-form">
-      <textarea id="post-content" placeholder="レスを書く..."></textarea>
+  <h2>スレ作成</h2>
+  <form id="threadForm">
+    <input type="text" id="threadTitle" placeholder="スレタイトル" required>
+    <button type="submit">作成</button>
+  </form>
+
+  <hr>
+
+  <div id="threadView" style="display:none;">
+    <h2 id="currentThreadTitle"></h2>
+    <div id="postList"></div>
+
+    <h3>レス投稿</h3>
+    <form id="postForm">
+      <textarea id="postContent" placeholder="レス内容" required></textarea><br>
       <button type="submit">投稿</button>
     </form>
-    <button id="back">← スレ一覧に戻る</button>
   </div>
 
   <script>
@@ -35,71 +42,85 @@
 
     let currentThreadId = null;
 
-    // スレ一覧表示
     async function loadThreads() {
-      const { data, error } = await supabase.from('threads').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase
+        .from("threads")
+        .select("*")
+        .order("created_at", { ascending: false });
       if (error) {
         console.error(error);
         return;
       }
-      const list = document.getElementById('thread-list');
-      list.innerHTML = '';
+      const list = document.getElementById("threadList");
+      list.innerHTML = "";
       data.forEach(thread => {
-        const div = document.createElement('div');
-        div.className = 'thread';
-        div.innerHTML = `<h2>${thread.title}</h2>`;
-        div.querySelector('h2').addEventListener('click', () => openThread(thread));
+        const div = document.createElement("div");
+        div.className = "thread";
+        const link = document.createElement("span");
+        link.className = "link";
+        link.textContent = thread.title;
+        link.onclick = () => openThread(thread.id, thread.title);
+        div.appendChild(link);
         list.appendChild(div);
       });
     }
 
-    // スレを開く
-    async function openThread(thread) {
-      currentThreadId = thread.id;
-      document.getElementById('thread-title').textContent = thread.title;
-      document.getElementById('thread-list').style.display = 'none';
-      document.getElementById('thread-view').style.display = 'block';
+    async function openThread(threadId, title) {
+      currentThreadId = threadId;
+      document.getElementById("threadView").style.display = "block";
+      document.getElementById("currentThreadTitle").textContent = title;
       loadPosts();
     }
 
-    // レス一覧表示
     async function loadPosts() {
-      const { data, error } = await supabase.from('posts').select('*').eq('thread_id', currentThreadId).order('created_at', { ascending: true });
+      const { data, error } = await supabase
+        .from("posts")
+        .select("*")
+        .eq("thread_id", currentThreadId)
+        .order("created_at", { ascending: true });
       if (error) {
         console.error(error);
         return;
       }
-      const list = document.getElementById('post-list');
-      list.innerHTML = '';
-      data.forEach((post, i) => {
-        const div = document.createElement('div');
-        div.className = 'post';
-        div.innerHTML = `<b>${i+1}:</b> ${post.content}`;
+      const list = document.getElementById("postList");
+      list.innerHTML = "";
+      data.forEach((post, index) => {
+        const div = document.createElement("div");
+        div.className = "post";
+        div.textContent = `${index + 1}: ${post.content}`;
         list.appendChild(div);
       });
     }
 
-    // レス投稿
-    document.getElementById('post-form').addEventListener('submit', async (e) => {
+    document.getElementById("threadForm").addEventListener("submit", async e => {
       e.preventDefault();
-      const content = document.getElementById('post-content').value.trim();
-      if (!content) return;
-      const { error } = await supabase.from('posts').insert([{ thread_id: currentThreadId, content }]);
+      const title = document.getElementById("threadTitle").value;
+      const { error } = await supabase
+        .from("threads")
+        .insert([{ title }]);
       if (error) {
         console.error(error);
-        return;
+      } else {
+        document.getElementById("threadTitle").value = "";
+        loadThreads();
       }
-      document.getElementById('post-content').value = '';
-      loadPosts();
     });
 
-    // 戻るボタン
-    document.getElementById('back').addEventListener('click', () => {
-      document.getElementById('thread-view').style.display = 'none';
-      document.getElementById('thread-list').style.display = 'block';
-      loadThreads();
+    document.getElementById("postForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      const content = document.getElementById("postContent").value;
+      const { error } = await supabase
+        .from("posts")
+        .insert([{ thread_id: currentThreadId, content }]);
+      if (error) {
+        console.error(error);
+      } else {
+        document.getElementById("postContent").value = "";
+        loadPosts();
+      }
     });
 
+    // 初期ロード
     loadThreads();
   </script>
 </body>
