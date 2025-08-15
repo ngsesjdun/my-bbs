@@ -1,42 +1,119 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>スレ一覧</title>
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<meta charset="UTF-8">
+<title>おんJ風掲示板</title>
+<style>
+  body { font-family: sans-serif; }
+  .thread-list { margin-bottom: 30px; }
+  .thread { margin: 5px 0; }
+  .post { margin: 5px 0; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+  .form-section { margin-top: 10px; }
+</style>
+<script src="https://unpkg.com/@supabase/supabase-js"></script>
 </head>
 <body>
-  <h1>スレ一覧　ちんこの呼吸板の方　なんJ作成</h1>
+
+<h1>おんJ風掲示板</h1>
+
+<!-- 新スレ作成フォーム -->
+<div>
+  <h2>新スレ作成</h2>
+  <input id="new-thread-title" placeholder="スレタイ">
+  <button onclick="createThread()">スレ立て</button>
+</div>
+
+<hr>
+
+<!-- スレ一覧 -->
+<div class="thread-list">
+  <h2>スレ一覧</h2>
   <div id="threads"></div>
+</div>
 
-  <script>
-    const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8";
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+<hr>
 
-    async function loadThreads() {
-      const { data, error } = await supabase
-        .from('threads')
-        .select('*')
-        .order('created_at', { ascending: false });
+<!-- スレ表示エリア -->
+<div id="thread-view">
+  <h2 id="thread-title"></h2>
+  <div id="posts"></div>
 
-      if (error) {
-        console.error(error);
-        return;
-      }
+  <div class="form-section">
+    <input id="new-post-content" placeholder="レス内容">
+    <button onclick="createPost()">レス投稿</button>
+  </div>
+</div>
 
-      const container = document.getElementById('threads');
-      container.innerHTML = '';
-      data.forEach(thread => {
-        const link = document.createElement('a');
-        link.href = '#'; // ここは後でスレ詳細表示に切り替える
-        link.textContent = thread.title;
-        link.style.display = 'block';
-        container.appendChild(link);
-      });
-    }
+<script>
+const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8";
 
-    loadThreads();
-  </script>
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let currentThreadId = null;
+let postSubscription = null;
+
+// スレ一覧取得
+async function loadThreads() {
+  const { data } = await supabase.from("threads").select("*").order("created_at", { ascending: false });
+  document.getElementById("threads").innerHTML = data.map(t =>
+    `<div class="thread"><a href="#thread-view" onclick="openThread('${t.id}', '${t.title}')">${t.title}</a></div>`
+  ).join("");
+}
+
+// 新スレ作成
+async function createThread() {
+  const title = document.getElementById("new-thread-title").value.trim();
+  if (!title) return;
+  await supabase.from("threads").insert({ title });
+  document.getElementById("new-thread-title").value = "";
+  loadThreads();
+}
+
+// スレを開く
+async function openThread(id, title) {
+  currentThreadId = id;
+  document.getElementById("thread-title").textContent = title;
+  loadPosts();
+
+  // 古い購読解除
+  if (postSubscription) {
+    supabase.removeChannel(postSubscription);
+  }
+
+  // 新しく購読開始
+  postSubscription = supabase
+    .channel("public:posts")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "posts", filter: `thread_id=eq.${id}` }, payload => {
+      appendPost(payload.new);
+    })
+    .subscribe();
+}
+
+// レス一覧取得
+async function loadPosts() {
+  const { data } = await supabase.from("posts").select("*").eq("thread_id", currentThreadId).order("created_at", { ascending: true });
+  const postsHTML = data.map((p, idx) => `<div class="post">${idx + 1}: ${p.content}</div>`).join("");
+  document.getElementById("posts").innerHTML = postsHTML;
+}
+
+// 新レス投稿
+async function createPost() {
+  const content = document.getElementById("new-post-content").value.trim();
+  if (!content || !currentThreadId) return;
+  await supabase.from("posts").insert({ thread_id: currentThreadId, content });
+  document.getElementById("new-post-content").value = "";
+}
+
+// 新規レス追加（リアルタイム）
+function appendPost(post) {
+  const postsDiv = document.getElementById("posts");
+  const index = postsDiv.children.length + 1;
+  postsDiv.innerHTML += `<div class="post">${index}: ${post.content}</div>`;
+}
+
+// 初期読み込み
+loadThreads();
+</script>
+
 </body>
 </html>
