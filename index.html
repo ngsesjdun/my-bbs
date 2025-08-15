@@ -3,120 +3,111 @@
 <head>
 <meta charset="UTF-8">
 <title>おんJ風掲示板</title>
-<script type="module">
-import { createClient } from 'https://esm.sh/@supabase/supabase-js'
-
-// --- ここからSupabase接続情報 ---
-const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co"
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8"
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
-let currentThreadId = null
-// --- ここまで ---
-
-const threadsDiv = document.getElementById('threads')
-const postsDiv = document.getElementById('posts')
-
-async function loadThreads() {
-  const { data } = await supabase.from('threads').select('*').order('created_at', { ascending:false })
-  threadsDiv.innerHTML = ''
-  data.forEach(t=>{
-    const div = document.createElement('div')
-    div.className='thread'
-    div.innerHTML=`<a href="#" onclick="openThread('${t.id}','${t.title}')">${t.title}</a>`
-    threadsDiv.appendChild(div)
-  })
-}
-
-async function createThread() {
-  const title = document.getElementById('thread-title').value.trim()
-  if(!title) return
-  const { data } = await supabase.from('threads').insert({title}).select()
-  document.getElementById('thread-title').value=''
-  loadThreads()
-  if(data && data[0]) openThread(data[0].id,data[0].title)
-}
-
-async function openThread(id,title){
-  currentThreadId=id
-  document.getElementById('thread-view').style.display='block'
-  document.getElementById('thread-title-view').textContent=title
-  loadPosts()
-  subscribePosts()
-}
-
-async function loadPosts(){
-  if(!currentThreadId) return
-  const { data } = await supabase.from('posts').select('*').eq('thread_id',currentThreadId).order('created_at',{ascending:true})
-  renderPosts(data)
-}
-
-function renderPosts(posts){
-  postsDiv.innerHTML=''
-  posts.forEach((p,i)=>{
-    const div=document.createElement('div')
-    div.className='post'
-    const time = p.created_at ? new Date(p.created_at+'Z').toLocaleString('ja-JP',{hour12:false}) : ''
-    div.innerHTML=`<span class="number">${i+1}</span> <span class="name">名無し</span>：${p.content}<br><span class="time">${time}</span>`
-    postsDiv.appendChild(div)
-  })
-  postsDiv.scrollTop=postsDiv.scrollHeight
-}
-
-async function createPost(){
-  if(!currentThreadId) return
-  const content=document.getElementById('post-content').value.trim()
-  if(!content) return
-  await supabase.from('posts').insert({thread_id:currentThreadId,content})
-  document.getElementById('post-content').value=''
-}
-
-function subscribePosts(){
-  supabase.channel('posts-channel')
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'posts',filter:`thread_id=eq.${currentThreadId}`},payload=>{
-      const p=payload.new
-      const div=document.createElement('div')
-      div.className='post'
-      const time = p.created_at ? new Date(p.created_at+'Z').toLocaleString('ja-JP',{hour12:false}) : ''
-      div.innerHTML=`<span class="number">?</span> <span class="name">名無し</span>：${p.content}<br><span class="time">${time}</span>`
-      postsDiv.appendChild(div)
-      postsDiv.scrollTop=postsDiv.scrollHeight
-    })
-    .subscribe()
-}
-
-// スレッドリアルタイム
-supabase.channel('threads-channel')
-  .on('postgres_changes',{event:'INSERT',schema:'public',table:'threads'},()=>{loadThreads()})
-  .subscribe()
-
-window.loadThreads=loadThreads
-window.createThread=createThread
-window.openThread=openThread
-window.createPost=createPost
-
-loadThreads()
-</script>
+<style>
+body { font-family: sans-serif; background: #f5f5f5; }
+.container { max-width: 800px; margin: auto; background: white; padding: 1em; }
+.thread, .post { border-bottom: 1px solid #ccc; padding: 0.5em; }
+a { text-decoration: none; color: blue; }
+</style>
 </head>
 <body>
 <div class="container">
   <h1>おんJ風掲示板</h1>
 
-  <div id="thread-input">
-    <input id="thread-title" placeholder="スレタイ">
-    <button onclick="createThread()">作成</button>
-  </div>
+  <div id="thread-list"></div>
 
-  <div id="threads"></div>
+  <h2>スレッド作成</h2>
+  <input id="thread-title" placeholder="スレタイ">
+  <button onclick="createThread()">作成</button>
 
   <div id="thread-view" style="display:none;">
     <h2 id="thread-title-view"></h2>
     <div id="post-list"></div>
-    <div id="post-input">
-      <input id="post-content" placeholder="レス内容">
-      <button onclick="createPost()">レスする</button>
-    </div>
-    <div id="posts"></div>
+    <input id="post-content" placeholder="レス内容">
+    <button onclick="createPost()">レスする</button>
   </div>
 </div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js'
+
+const SUPABASE_URL = "YOUR_SUPABASE_URL"
+const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY"
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+let currentThreadId = null
+
+async function loadThreads() {
+  const { data } = await supabase.from('threads').select('*').order('created_at', { ascending: false })
+  const list = document.getElementById('thread-list')
+  list.innerHTML = ''
+  data.forEach(t => {
+    const div = document.createElement('div')
+    div.className = 'thread'
+    div.innerHTML = `<a href="#" onclick="openThread('${t.id}', '${t.title}')">${t.title}</a>`
+    list.appendChild(div)
+  })
+}
+
+async function createThread() {
+  const title = document.getElementById('thread-title').value
+  if (!title) return
+  await supabase.from('threads').insert({ title })
+  document.getElementById('thread-title').value = ''
+}
+
+async function openThread(id, title) {
+  currentThreadId = id
+  document.getElementById('thread-view').style.display = 'block'
+  document.getElementById('thread-title-view').textContent = title
+  loadPosts(id)
+  subscribePosts(id)
+}
+
+async function loadPosts(threadId) {
+  const { data } = await supabase.from('posts').select('*').eq('thread_id', threadId).order('created_at', { ascending: true })
+  renderPosts(data)
+}
+
+function renderPosts(posts) {
+  const list = document.getElementById('post-list')
+  list.innerHTML = ''
+  posts.forEach(p => {
+    const div = document.createElement('div')
+    div.className = 'post'
+    div.textContent = p.content
+    list.appendChild(div)
+  })
+}
+
+async function createPost() {
+  const content = document.getElementById('post-content').value
+  if (!content) return
+  await supabase.from('posts').insert({ thread_id: currentThreadId, content })
+  document.getElementById('post-content').value = ''
+}
+
+function subscribePosts(threadId) {
+  supabase.channel('posts-channel')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts', filter: `thread_id=eq.${threadId}` }, payload => {
+      const newPost = payload.new
+      const div = document.createElement('div')
+      div.className = 'post'
+      div.textContent = newPost.content
+      document.getElementById('post-list').appendChild(div)
+    })
+    .subscribe()
+}
+
+loadThreads()
+
+// スレッドのリアルタイム更新
+supabase.channel('threads-channel')
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'threads' }, payload => {
+    loadThreads()
+  })
+  .subscribe()
+
+</script>
 </body>
 </html>
