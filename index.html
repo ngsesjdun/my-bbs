@@ -92,9 +92,90 @@
 
   let currentThreadId = null;
 
+  // ===== 共通ユーティリティ =====
+  const JST_OFFSET_MS = 9 * 60 * 60 * 1000; // UTC→JST
   const fmt = (ts) => ts ? new Date(ts + "Z").toLocaleString("ja-JP",{hour12:false}) : "";
 
-  // スレ一覧
+  // 当日キー（JSTで日替わり）
+  const jstDateKey = (dateLike) => {
+    const t = (dateLike instanceof Date) ? dateLike.getTime() : Date.parse(dateLike);
+    const j = new Date(t + JST_OFFSET_MS);
+    const y = j.getUTCFullYear();
+    const m = String(j.getUTCMonth()+1).padStart(2,'0');
+    const d = String(j.getUTCDate()).padStart(2,'0');
+    return `${y}${m}${d}`; // YYYYMMDD
+  };
+
+  // 簡易ハッシュ（DJB2）
+  const hashStr = (s) => {
+    let h = 5381;
+    for (let i=0;i<s.length;i++) h = ((h<<5)+h) + s.charCodeAt(i);
+    return (h >>> 0); // uint32
+  };
+
+  // 4文字ID（当日・スレID・レスIDで決定論的）
+  const postId4 = (thread_id, post_id, created_at) => {
+    const day = jstDateKey(created_at ?? Date.now());
+    const h = hashStr(`${thread_id}|${post_id}|${day}`);
+    // base36→上位4文字（読みやすさ優先で先頭4）
+    return h.toString(36).toUpperCase().padStart(4,'0').slice(0,4);
+  };
+
+  // ===== 連投制限（フロント側） =====
+  const POST_LIMIT_MS = 2000;       // 2秒
+  const BURST_LIMIT_N = 15;         // 15連投
+  const BURST_WINDOW_MS = 60_000;   // 60秒
+  const BURST_PENALTY_MS = 60_000;  // 1分ロック
+  const LS_KEY = "onj_rate";
+
+  const nowMs = () => Date.now();
+
+  const loadRate = () => {
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || "{}"); }
+    catch { return {}; }
+  };
+  const saveRate = (obj) => localStorage.setItem(LS_KEY, JSON.stringify(obj));
+
+  const canPost = () => {
+    const st = loadRate();
+    const n = nowMs();
+
+    // 直近投稿時刻チェック
+    if (st.lastPostAt && n - st.lastPostAt < POST_LIMIT_MS) {
+      const wait = Math.ceil((POST_LIMIT_MS - (n - st.lastPostAt))/1000);
+      return { ok:false, msg:`連投制限中です（${wait}秒）` };
+    }
+
+    // バーストロック
+    if (st.lockUntil && n < st.lockUntil) {
+      const wait = Math.ceil((st.lockUntil - n)/1000);
+      return { ok:false, msg:`連投ロック中です（${wait}秒）` };
+    }
+
+    // 直近60秒の自己投稿件数
+    const arr = (st.times || []).filter(t => n - t <= BURST_WINDOW_MS);
+    if (arr.length >= BURST_LIMIT_N) {
+      // ロック発動
+      st.lockUntil = n + BURST_PENALTY_MS;
+      st.times = arr;
+      saveRate(st);
+      return { ok:false, msg:"15連投に達しました。1分間書き込めません。" };
+    }
+
+    return { ok:true };
+  };
+
+  const markPosted = () => {
+    const st = loadRate();
+    const n = nowMs();
+    const arr = (st.times || []).filter(t => n - t <= BURST_WINDOW_MS);
+    arr.push(n);
+    st.times = arr;
+    st.lastPostAt = n;
+    saveRate(st);
+  };
+
+  // ===== スレ一覧 =====
   async function loadThreads(){
     const { data, error } = await db.from("threads")
       .select("*")
@@ -122,6 +203,8 @@
   btnCreate.addEventListener("click", async ()=>{
     const title = newTitle.value.trim();
     if(!title){ alert("タイトルを入れて"); return; }
+    if (title.length > 200) { alert("スレタイは200文字以内にしてください"); return; }
+
     const { data, error } = await db.from("threads").insert([{ title }]).select().limit(1).maybeSingle();
     if(error){ console.error("スレ作成失敗:", error); alert("スレ作成失敗"); return; }
     newTitle.value = "";
@@ -138,7 +221,7 @@
     await loadPosts();
   }
 
-  // レス一覧（posts.content）
+  // レス一覧（ID/時間付き）
   async function loadPosts(){
     if(!currentThreadId) return;
     const { data, error } = await db.from("posts")
@@ -148,21 +231,33 @@
     if(error){ console.error("レス読み込み失敗:", error); return; }
     postsEl.innerHTML = "";
     (data||[]).forEach((p,i)=>{
+      const id4 = postId4(p.thread_id, p.id, p.created_at);
+      const d = p.created_at ? new Date(p.created_at + "Z") : null;
+      const timeJ = d ? d.toLocaleTimeString("ja-JP",{hour12:false, hour:"2-digit", minute:"2-digit"}) : "";
       const div = document.createElement("div");
       div.className = "post";
-      div.innerHTML = `<span class="no">${i+1}</span> ${p.content || ""}<br><span class="time">${fmt(p.created_at)}</span>`;
+      div.innerHTML = `<span class="no">${i+1}</span> ${p.content || ""}<br><span class="time">${timeJ} ID:${id4}</span>`;
       postsEl.appendChild(div);
     });
     postsEl.scrollTop = postsEl.scrollHeight;
   }
 
-  // レス投稿（posts.content だけ）
+  // レス投稿（200文字制限＋連投制限）
   btnSend.addEventListener("click", async ()=>{
     if(!currentThreadId) return;
     const content = inputMsg.value.trim();
-    if(!content) return;
+    if(!content){ return; }
+    if (content.length > 200) {
+      alert("本文は200文字以内にしてください");
+      return;
+    }
+
+    const { ok, msg } = canPost();
+    if (!ok) { alert(msg); return; }
+
     const { error } = await db.from("posts").insert([{ thread_id: currentThreadId, content }]);
     if(error){ console.error("投稿失敗:", error); alert("投稿失敗"); return; }
+    markPosted();
     inputMsg.value = "";
     await loadPosts();
   });
