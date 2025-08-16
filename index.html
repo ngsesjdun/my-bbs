@@ -68,8 +68,8 @@
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js";
 
-const supabaseUrl = "https://YOUR_PROJECT.supabase.co";
-const supabaseKey = "YOUR_PUBLIC_ANON_KEY";
+const supabaseUrl = "https://owopzgeliyhgxpnywscy.supabase.co";
+const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const threadListView = document.getElementById("threadListView");
@@ -91,7 +91,7 @@ function escapeHTML(str) {
 }
 
 // 簡易NGワード
-const NG_WORDS = ["spam", "bot", "悪意"];
+const NG_WORDS = ["<script>",  "大麻"];
 function containsNGWord(str) {
   return NG_WORDS.some(word => str.includes(word));
 }
