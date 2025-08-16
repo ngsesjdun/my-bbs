@@ -2,124 +2,117 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>掲示板</title>
-  <script src="https://unpkg.com/@supabase/supabase-js"></script>
+  <title>おんJもどき</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
   <style>
-    body { font-family: メイリオ, Meiryo, "ＭＳ ゴシック", "Hiragino Kaku Gothic ProN", sans-serif; }
-    .thread { border: 1px solid #ccc; margin: 10px; padding: 10px; }
-    .response { margin-left: 20px; border-left: 2px solid #eee; padding-left: 10px; }
+    body { font-family: メイリオ, Meiryo, "ＭＳ ゴシック", "Hiragino Kaku Gothic ProN", "ヒラギノ角ゴ ProN W3", sans-serif; }
+    .thread { border: 1px solid #ccc; padding: 8px; margin: 8px; cursor: pointer; }
+    .response { margin-left: 20px; }
   </style>
 </head>
 <body>
-  <h1>おんJ</h1>
+  <h1>おんJ風掲示板</h1>
 
   <!-- スレ作成フォーム -->
-  <h2>新規スレッド作成</h2>
-  <input id="thread-title" placeholder="スレタイ"><br>
-  <textarea id="thread-body" placeholder="本文"></textarea><br>
-  <button onclick="createThread()">スレ建て</button>
+  <form id="thread-form">
+    <input type="text" id="title" placeholder="スレタイ" required>
+    <textarea id="body" placeholder="本文" required></textarea>
+    <button type="submit">スレ作成</button>
+  </form>
 
   <div id="threads"></div>
 
-  <script>
-    const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8"; // ←さっきのキーを入れる
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  <!-- レス表示・投稿フォーム -->
+  <div id="thread-detail" style="display:none;">
+    <h2 id="thread-title"></h2>
+    <p id="thread-body"></p>
+    <div id="responses"></div>
+    <form id="response-form">
+      <textarea id="response-text" placeholder="レス内容" required></textarea>
+      <button type="submit">レス投稿</button>
+    </form>
+  </div>
 
-    let currentThreadId = null;
+<script>
+const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8";
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // ランダムID（0時で日替わり）
-    function getUserId() {
-      const today = new Date().toISOString().slice(0,10);
-      let seed = today + Math.random();
-      return btoa(seed).substring(0,4);
-    }
+let currentThreadId = null;
 
-    function formatTime(dateStr) {
-      let d = new Date(dateStr);
-      return d.getHours().toString().padStart(2,'0') + ":" +
-             d.getMinutes().toString().padStart(2,'0');
-    }
+// ランダムID (日付更新 0時ごと)
+function generateUserId() {
+  const now = new Date();
+  const seed = now.toDateString(); // 日付でリセット
+  const random = Math.random().toString(36).substring(2, 6);
+  return random;
+}
 
-    // スレ建て
-    async function createThread() {
-      const title = document.getElementById("thread-title").value;
-      const body = document.getElementById("thread-body").value;
-      let { data, error } = await supabase
-        .from("threads")
-        .insert([{ title, body }]);
-      if (error) alert(error.message);
-    }
+// 時刻フォーマット
+function formatTime(dateStr) {
+  const d = new Date(dateStr);
+  return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
 
-    // レス投稿
-    async function createResponse(thread_id) {
-      const content = document.getElementById("response-" + thread_id).value;
-      let { error } = await supabase
-        .from("responses")
-        .insert([{ thread_id, content, user_id: getUserId() }]);
-      if (error) alert(error.message);
-    }
+// スレ一覧読み込み
+async function loadThreads() {
+  const { data } = await supabase.from("threads").select("*").order("id", { ascending: false });
+  const container = document.getElementById("threads");
+  container.innerHTML = "";
+  data.forEach(t => {
+    const div = document.createElement("div");
+    div.className = "thread";
+    div.textContent = t.title;
+    div.onclick = () => openThread(t);
+    container.appendChild(div);
+  });
+}
 
-    // スレ一覧読み込み
-    async function loadThreads() {
-      let { data: threads } = await supabase
-        .from("threads")
-        .select("*")
-        .order("created_at", { ascending: false });
+// スレ作成
+document.getElementById("thread-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const title = document.getElementById("title").value;
+  const body = document.getElementById("body").value;
+  await supabase.from("threads").insert([{ title, body }]);
+  document.getElementById("title").value = "";
+  document.getElementById("body").value = "";
+  loadThreads();
+};
 
-      let container = document.getElementById("threads");
-      container.innerHTML = "";
+// スレを開く
+async function openThread(thread) {
+  currentThreadId = thread.id;
+  document.getElementById("thread-title").textContent = thread.title;
+  document.getElementById("thread-body").textContent = thread.body;
+  document.getElementById("thread-detail").style.display = "block";
+  loadResponses();
+}
 
-      for (let thread of threads) {
-        let div = document.createElement("div");
-        div.className = "thread";
-        div.innerHTML = `
-          <h3>${thread.title}</h3>
-          <p>${thread.body || ""}</p>
-          <div id="responses-${thread.id}"></div>
-          <textarea id="response-${thread.id}" placeholder="レスを書き込む"></textarea><br>
-          <button onclick="createResponse('${thread.id}')">レスする</button>
-        `;
-        container.appendChild(div);
-        loadResponses(thread.id);
-      }
-    }
+// レス一覧読み込み
+async function loadResponses() {
+  const { data } = await supabase.from("responses").select("*").eq("thread_id", currentThreadId).order("id", { ascending: true });
+  const container = document.getElementById("responses");
+  container.innerHTML = "";
+  data.forEach((r, i) => {
+    const div = document.createElement("div");
+    div.className = "response";
+    const time = formatTime(r.created_at);
+    div.textContent = `${i+1}: [${r.user_id}] ${r.content} (${time})`;
+    container.appendChild(div);
+  });
+}
 
-    // レス読み込み
-    async function loadResponses(thread_id) {
-      let { data: responses } = await supabase
-        .from("responses")
-        .select("*")
-        .eq("thread_id", thread_id)
-        .order("created_at", { ascending: true });
+// レス投稿
+document.getElementById("response-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const content = document.getElementById("response-text").value;
+  const user_id = generateUserId();
+  await supabase.from("responses").insert([{ thread_id: currentThreadId, content, user_id }]);
+  document.getElementById("response-text").value = "";
+  loadResponses();
+};
 
-      let container = document.getElementById("responses-" + thread_id);
-      container.innerHTML = "";
-      responses.forEach((res, i) => {
-        let div = document.createElement("div");
-        div.className = "response";
-        div.innerHTML = `
-          <b>${i+1}</b>：${res.content}<br>
-          (${formatTime(res.created_at)} ID:${res.user_id})
-        `;
-        container.appendChild(div);
-      });
-    }
-
-    // リアルタイム更新
-    supabase.channel("responses")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "responses" }, payload => {
-        loadResponses(payload.new.thread_id);
-      })
-      .subscribe();
-
-    supabase.channel("threads")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "threads" }, payload => {
-        loadThreads();
-      })
-      .subscribe();
-
-    loadThreads();
-  </script>
+loadThreads();
+</script>
 </body>
 </html>
