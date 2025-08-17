@@ -44,151 +44,90 @@
     const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8";
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const threadListView = document.getElementById("threadListView");
-    const threadDetailView = document.getElementById("threadDetailView");
-    const threadList = document.getElementById("threadList");
-    const postList = document.getElementById("postList");
-    const threadTitleEl = document.getElementById("threadTitle");
-    let currentThreadId = null;
+    <script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js";
 
-    // ユーザID（日付ごと固定）
-    function genUserHash() {
-      const today = new Date().toISOString().slice(0,10);
-      return btoa(today + "fixed").substring(0,4);
+// Supabaseの設定
+const supabaseUrl = "https://YOUR_PROJECT.supabase.co";  // ←置き換え
+const supabaseKey = "YOUR_PUBLIC_ANON_KEY";              // ←置き換え
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+async function fetchThreads() {
+  const { data, error } = await supabase
+    .from("threads_with_activity")
+    .select("*")
+    .order("last_activity_at", { ascending: false }); // ←最新レスで上がる
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  const threadList = document.getElementById("threadList");
+  threadList.innerHTML = "";
+
+  data.forEach((thread) => {
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <strong>${thread.title}</strong> 
+      （レス数: ${thread.post_count}）
+      <br>
+      最終更新: ${new Date(thread.last_activity_at).toLocaleString()}
+    `;
+    li.onclick = () => loadThread(thread.id, thread.title);
+    threadList.appendChild(li);
+  });
+}
+
+async function loadThread(threadId, title) {
+  document.getElementById("threadTitle").innerText = title;
+
+  const { data, error } = await supabase
+    .from("posts")
+    .select("*")
+    .eq("thread_id", threadId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  const postList = document.getElementById("postList");
+  postList.innerHTML = "";
+  data.forEach((post) => {
+    const li = document.createElement("li");
+    li.textContent = `${new Date(post.created_at).toLocaleTimeString()} ID:${post.user_hash} - ${post.content}`;
+    postList.appendChild(li);
+  });
+
+  document.getElementById("postForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const content = document.getElementById("postContent").value;
+
+    const { error } = await supabase.from("posts").insert({
+      thread_id: threadId,
+      content: content,
+      user_hash: genUserHash()
+    });
+
+    if (error) {
+      console.error(error);
+    } else {
+      document.getElementById("postContent").value = "";
+      loadThread(threadId, title);
+      fetchThreads(); // ←書き込み後にスレ一覧も更新（上がる用）
     }
+  };
+}
 
-    // XSS対策
-    function escapeHTML(str) {
-      return str.replace(/[&<>"']/g, m => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[m]));
-    }
+// 簡易ID生成（0時で更新）
+function genUserHash() {
+  const today = new Date().toISOString().slice(0,10);
+  return btoa(today + Math.random()).substring(0,4);
+}
 
-    // 簡易NGワード
-    const NG_WORDS = ["spam", "bot", "悪意"]; // 必要に応じて増やす
-
-    function containsNGWord(str) {
-      return NG_WORDS.some(word => str.includes(word));
-    }
-
-    // 簡易レート制限（同一ユーザが1分以内に投稿できない）
-    const lastPostTime = {};
-
-    function canPost(userHash) {
-      const now = Date.now();
-      if (lastPostTime[userHash] && now - lastPostTime[userHash] < 60000) return false;
-      lastPostTime[userHash] = now;
-      return true;
-    }
-
-    // スレ一覧を取得
-    async function fetchThreads() {
-      const { data, error } = await supabase
-        .from("threads_with_activity")
-        .select("*")
-        .order("last_activity_at", { ascending: false });
-
-      if (error) {
-        console.error(error);
-        return;
-      }
-
-      threadList.innerHTML = "";
-      data.forEach((thread) => {
-        const li = document.createElement("li");
-        li.innerHTML = `
-          <span class="thread-title" data-id="${thread.id}">
-            ${escapeHTML(thread.title)}
-          </span>
-          （レス数: ${thread.post_count}）
-        `;
-        threadList.appendChild(li);
-      });
-
-      document.querySelectorAll(".thread-title").forEach(el => {
-        el.onclick = () => openThread(el.dataset.id, el.textContent);
-      });
-    }
-
-    // スレ詳細を表示
-    async function openThread(threadId, title) {
-      currentThreadId = threadId;
-      threadTitleEl.textContent = title;
-
-      const { data: posts, error } = await supabase
-        .from("posts")
-        .select("*")
-        .eq("thread_id", threadId)
-        .order("created_at", { ascending: true });
-
-      if (error) {
-        console.error(error);
-        return;
-      }
-
-      postList.innerHTML = "";
-      posts.forEach(post => {
-        const li = document.createElement("li");
-        li.textContent = `${new Date(post.created_at).toLocaleTimeString()} ID:${post.user_hash} - ${escapeHTML(post.content)}`;
-        postList.appendChild(li);
-      });
-
-      threadListView.classList.add("hidden");
-      threadDetailView.classList.remove("hidden");
-    }
-
-    // 戻る
-    document.getElementById("backButton").onclick = () => {
-      threadDetailView.classList.add("hidden");
-      threadListView.classList.remove("hidden");
-      fetchThreads();
-    };
-
-    // スレ作成
-    document.getElementById("newThreadForm").onsubmit = async (e) => {
-      e.preventDefault();
-      const title = document.getElementById("newThreadTitle").value.trim();
-      if (!title) return alert("タイトルを入力してください");
-      if (containsNGWord(title)) return alert("NGワードが含まれています");
-
-      const { data, error } = await supabase
-        .from("threads")
-        .insert({ title })
-        .select()
-        .single();
-
-      if (error) {
-        console.error(error);
-        return;
-      }
-
-      document.getElementById("newThreadTitle").value = "";
-      fetchThreads();
-    };
-
-    // 投稿
-    document.getElementById("postForm").onsubmit = async (e) => {
-      e.preventDefault();
-      const content = document.getElementById("postContent").value.trim();
-      const userHash = genUserHash();
-
-      if (!content) return alert("書き込みを入力してください");
-      if (containsNGWord(content)) return alert("NGワードが含まれています");
-      if (!canPost(userHash)) return alert("1分以内に連続投稿できません");
-
-      const { error } = await supabase.from("posts").insert({
-        thread_id: currentThreadId,
-        content: content,
-        user_hash: userHash
-      });
-
-      if (error) {
-        console.error(error);
-      } else {
-        document.getElementById("postContent").value = "";
-        openThread(currentThreadId, threadTitleEl.textContent);
-      }
-    };
-
-    fetchThreads();
-  </script>
+fetchThreads();
+</script>
 </body>
 </html>
