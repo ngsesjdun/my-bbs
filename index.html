@@ -5,11 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>なんI</title>
 </head>
-<body bgcolor="#EFEFEF" text="#000000" link="#000000" vlink="#000000" alink="#000000">
+<body bgcolor="#EFEFEF" text="#000000">
 
 <div id="header" style="font-weight:bold; font-size:20px; margin:8px 0;">なんでも実況ジュピター</div>
-<br>アプデ情報</br>
-<br>23:30 おんJっぽくしました</bro>
+<br>改善されるまでスレ開いたスクロールしないとレス見えません</br>
 
 <div id="wrap">
   <div id="new-thread">
@@ -20,7 +19,7 @@
   <div id="thread-box"></div>
 
   <div id="thread-view" style="display:none; margin-top:8px;">
-    <div id="thread-title" style="color:green; font-weight:bold; margin-bottom:4px;"></div>
+    <div id="thread-title" style="color:blue; font-weight:bold; margin-bottom:4px;"></div>
     <div id="posts"></div>
     <div id="post-form-wrap" style="margin-top:4px;">
       <form id="post-form" onsubmit="return false;">
@@ -53,7 +52,6 @@ let lastPostTime = 0;
 let currentId = null;
 let lastIdDate = null;
 
-// 日替わりID生成
 function generateDailyId() {
   const today = new Date().toISOString().slice(0,10);
   if(currentId && lastIdDate === today) return currentId;
@@ -66,12 +64,6 @@ function generateDailyId() {
 }
 generateDailyId();
 
-// HTMLエスケープ
-function escapeHTML(str){
-  return str.replace(/[&<>"']/g, s => ({'&':'&','<':'<;','>':'>;','"':'&quot;',"'":'&#39;'}[s]));
-}
-
-// 日時フォーマット
 function fmt(ts){
   if(!ts) return "";
   const d = (ts instanceof Date) ? ts : new Date(ts);
@@ -82,31 +74,28 @@ function fmt(ts){
          `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())},${pad(d.getMilliseconds(),3)}`;
 }
 
-// スレ一覧表示
+// スレ一覧
 async function loadThreads(){
   const { data, error } = await db.from("threads").select("*").order("created_at",{ascending:false});
   if(error){ console.error(error); return; }
   threadBox.innerHTML="";
   (data||[]).forEach(th=>{
-    const row=document.createElement("div");
-    row.style.border="1px solid #000";
-    row.style.padding="4px";
-    row.style.margin="2px 0";
+    const row = document.createElement("div");
+    row.style.border = "1px solid #000";  // スレの枠
+    row.style.margin = "2px 0";
+    row.style.padding = "4px";
 
-    const a=document.createElement("a");
-    a.href="#";
-    a.style.color="green";
-    a.style.textDecoration="none";
-    a.textContent = escapeHTML(th.title);
-    a.onclick = e=>{
-      e.preventDefault();
-      openThread(th.id, th.title);
-    };
+    const a = document.createElement("a");
+    a.href = "#";
+    a.style.color = "blue";
+    a.style.textDecoration = "none";
+    a.textContent = th.title;
+    a.onclick = e => { e.preventDefault(); openThread(th.id, th.title); };
 
-    const meta=document.createElement("span");
+    const meta = document.createElement("span");
     meta.style.color="#000";
     meta.style.fontSize="12px";
-    meta.style.marginLeft="6px";
+    meta.style.marginLeft="0px";
     meta.textContent = fmt(th.created_at);
 
     row.appendChild(a);
@@ -129,7 +118,7 @@ btnCreate.addEventListener("click", async ()=>{
 // スレ詳細表示
 async function openThread(id,title){
   currentThreadId=id;
-  viewTitle.textContent=escapeHTML(title);
+  viewTitle.textContent = title;
   viewWrap.style.display="block";
   document.getElementById("thread-view").scrollIntoView({behavior:"smooth",block:"start"});
   await loadPosts();
@@ -145,17 +134,23 @@ async function loadPosts(){
   if(error){ console.error(error); return; }
   postsEl.innerHTML="";
   (data||[]).forEach((p,i)=>{
-    const div=document.createElement("div");
-    div.style.borderBottom="1px solid #000";
-    div.style.margin="2px 0";
-    div.style.padding="2px 0";
+    const div = document.createElement("div");
+    div.style.borderBottom = "1px solid #000";  // 区切りだけの枠
+    div.style.margin = "2px 0";
+    div.style.padding = "2px";
 
-    const content = escapeHTML(p.content||"");
-    const userIdMatch = content.match(/^\[([A-Z0-9]{4})\]\s*/);
+    const userIdMatch = p.content.match(/^\[([A-Z0-9]{4})\]\s*/);
     const userId = userIdMatch ? userIdMatch[1] : '----';
-    const msg = userIdMatch ? content.replace(/^\[[A-Z0-9]{4}\]\s*/,'') : content;
+    const msg = userIdMatch ? p.content.replace(/^\[[A-Z0-9]{4}\]\s*/,'') : p.content;
 
-    div.textContent = `[${i+1}]：名無し：${fmt(p.created_at)} ID:[${userId}] ${msg}`;
+    const nameSpan = document.createElement("span");
+    nameSpan.style.color = "green";
+    nameSpan.textContent = "名無し";
+
+    div.appendChild(document.createTextNode(`[${i+1}]：`));
+    div.appendChild(nameSpan);
+    div.appendChild(document.createTextNode(`：${fmt(p.created_at)} ID:[${userId}] ${msg}`));
+
     postsEl.appendChild(div);
   });
   postsEl.scrollTop = postsEl.scrollHeight;
@@ -164,11 +159,11 @@ async function loadPosts(){
 // 投稿送信
 btnSend.addEventListener("click", async ()=>{
   const now = Date.now();
-  if(now - lastPostTime < 2000){ alert("連投は2秒空けてください"); return; }
+  if(now - lastPostTime < 2000){ alert("連投は2秒空けてください！マルチポスト！？"); return; }
   if(!currentThreadId) return;
   let content = inputMsg.value.trim();
   if(!content) return;
-  if(content.length > 200){ alert("本文は200文字までです"); return; }
+  if(content.length > 200){ alert("本文は200文字まで！"); return; }
   const userId = generateDailyId();
   const { error } = await db.from("posts").insert([{ thread_id:currentThreadId, content:`[${userId}] ${content}` }]);
   if(error){ console.error(error); alert("投稿失敗"); return; }
@@ -184,7 +179,7 @@ btnBack.addEventListener("click", ()=>{
   window.scrollTo({top:0,behavior:"smooth"});
 });
 
-// リアルタイム反映
+// リアルタイム
 db.channel("rt-posts")
   .on("postgres_changes",{event:"INSERT",schema:"public",table:"posts"},payload=>{
     if(payload?.new?.thread_id===currentThreadId) loadPosts();
