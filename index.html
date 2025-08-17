@@ -2,159 +2,170 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>なんI</title>
+<title>おんJ風掲示板</title>
 <style>
-  body { font-family: sans-serif; background:#f5f5f5; margin:0; }
-  header { background:#2c3e50; color:white; padding:10px; font-size:20px; }
-  #threadList, #postView { padding:10px; }
-  .thread { background:white; margin:5px 0; padding:10px; border-radius:8px; cursor:pointer; }
-  .post { background:white; margin:5px 0; padding:10px; border-radius:8px; }
-  .time { font-size:12px; color:#666; margin-left:5px; }
-  #btnBack, #btnScroll { margin:5px; padding:5px 10px; }
+  body { font-family: sans-serif; background: #f5f5f5; margin:0; }
+  header { background:#333; color:#fff; padding:10px; }
+  #threadList, #postArea { padding:10px; }
+  .thread { padding:8px; margin:5px 0; background:#fff; border:1px solid #ccc; cursor:pointer; }
+  .post { padding:6px; margin:4px 0; background:#fff; border-left:3px solid #999; }
+  #postForm, #threadForm { margin-top:10px; }
+  button { margin-top:5px; padding:5px 10px; }
+  #btnScroll { position:fixed; right:10px; bottom:10px; }
 </style>
 </head>
 <body>
-<h1>なんでも実況ジュピター</hq>
+<header><h1>おんJ風掲示板</h1></header>
 
-<div id="threadList">
-  <h2>スレ一覧</h2>
-  <form id="newThreadForm">
-    <input id="newTitle" placeholder="スレタイ" required maxlength="50">
-    <br>
-    <textarea id="newContent" placeholder="本文 (>>1)" required maxlength="200"></textarea>
-    <br>
-    <button type="submit">新規スレ作成</button>
-  </form>
-  <div id="threads"></div>
-</div>
+<!-- スレ一覧 -->
+<section id="threadList"></section>
 
-<div id="postView" style="display:none;">
-  <button id="btnBack">← スレ一覧へ</button>
-  <h2 id="threadTitle"></h2>
+<!-- スレ作成フォーム -->
+<section id="threadForm">
+  <h2>スレ立て</h2>
+  <input id="threadTitle" placeholder="スレタイ" style="width:100%;"><br>
+  <textarea id="threadContent" placeholder="本文" style="width:100%;height:60px;"></textarea><br>
+  <button id="btnNewThread">スレを立てる</button>
+</section>
+
+<!-- スレ表示 -->
+<section id="postArea" style="display:none;">
+  <button id="btnBack">← スレ一覧に戻る</button>
+  <h2 id="currentTitle"></h2>
   <div id="posts"></div>
+
+  <!-- レス投稿フォーム -->
   <form id="postForm">
-    <input id="postContent" placeholder="書き込み" required maxlength="200">
-    <button type="submit">投稿</button>
+    <textarea id="inputMsg" placeholder="レスを書く…" style="width:100%;height:60px;"></textarea><br>
+    <button type="submit">書き込む</button>
   </form>
-  <button id="btnScroll">↓ 最新へ</button>
-</div>
+</section>
 
-<script src="https://unpkg.com/@supabase/supabase-js"></script>
-<script>
-const db = supabase.createClient("https://owopzgeliyhgxpnywscy.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8");
+<!-- 最新へスクロール -->
+<button id="btnScroll" style="display:none;">↓ 最新へ</button>
 
-const threadList = document.getElementById("threadList");
-const threadsEl = document.getElementById("threads");
-const postView = document.getElementById("postView");
-const postsEl = document.getElementById("posts");
-const threadTitleEl = document.getElementById("threadTitle");
-const formThread = document.getElementById("newThreadForm");
-const formPost = document.getElementById("postForm");
-const inputTitle = document.getElementById("newTitle");
-const inputContent = document.getElementById("newContent");
-const inputMsg = document.getElementById("postContent");
-const btnBack = document.getElementById("btnBack");
-const btnScroll = document.getElementById("btnScroll");
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js";
+
+const db = createClient("https://owopzgeliyhgxpnywscy.supabase.co","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8");
+
+const threadListEl=document.getElementById("threadList");
+const postsEl=document.getElementById("posts");
+const postArea=document.getElementById("postArea");
+const currentTitle=document.getElementById("currentTitle");
+const btnBack=document.getElementById("btnBack");
+const btnNewThread=document.getElementById("btnNewThread");
+const btnScroll=document.getElementById("btnScroll");
+const inputMsg=document.getElementById("inputMsg");
 
 let currentThreadId=null;
 
-function escapeHtml(str){
-  const div=document.createElement("div");
-  div.textContent=str;
-  return div.innerHTML;
-}
-function formatTime(iso){
-  const d=new Date(iso);
-  return `${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}:${d.getSeconds().toString().padStart(2,"0")}`;
-}
+// 日替わりID
 function generateDailyId(){
-  const base="id"+Math.floor(Math.random()*1000);
-  return base;
+  const today=new Date().toISOString().split("T")[0];
+  return Math.random().toString(36).substring(2,6)+"-"+today;
 }
 
-// スレ一覧を読み込み
+// スレ一覧読み込み
 async function loadThreads(){
-  const {data,error}=await db.from("threads").select("id,title,created_at").order("updated_at",{ascending:false});
+  const { data,error } = await db.from("threads")
+    .select("id,title,created_at,posts(count,created_at)")
+    .order("last_posted_at",{ascending:false});
   if(error){ console.error(error); return; }
-  threadsEl.innerHTML="";
-  data.forEach(th=>{
+
+  threadListEl.innerHTML="";
+  data.forEach(t=>{
     const div=document.createElement("div");
     div.className="thread";
-    div.innerHTML=`${escapeHtml(th.title)} <span class="time">${formatTime(th.created_at)}</span>`;
-    div.onclick=()=>openThread(th.id,th.title);
-    threadsEl.appendChild(div);
+    const count=t.posts?.[0]?.count ?? 0;
+    const last=new Date(t.last_posted_at||t.created_at).toLocaleString();
+    div.textContent=`${t.title} (${count}レス) [最終:${last}]`;
+    div.onclick=()=>openThread(t.id,t.title);
+    threadListEl.appendChild(div);
   });
 }
 
 // スレを開く
 async function openThread(id,title){
   currentThreadId=id;
-  threadList.style.display="none";
-  postView.style.display="block";
-  threadTitleEl.textContent=title;
+  currentTitle.textContent=title;
+  threadListEl.style.display="none";
+  document.getElementById("threadForm").style.display="none";
+  postArea.style.display="block";
+  btnScroll.style.display="block";
   await loadPosts();
 }
 
-// 投稿一覧
+// スレ一覧に戻る
+btnBack.onclick=()=>{
+  currentThreadId=null;
+  postArea.style.display="none";
+  btnScroll.style.display="none";
+  threadListEl.style.display="block";
+  document.getElementById("threadForm").style.display="block";
+  loadThreads();
+};
+
+// レス読み込み
 async function loadPosts(){
-  const {data,error}=await db.from("posts").select("id,content,created_at").eq("thread_id",currentThreadId).order("id");
+  if(!currentThreadId) return;
+  const { data,error } = await db.from("posts")
+    .select("id,content,created_at")
+    .eq("thread_id",currentThreadId)
+    .order("created_at",{ascending:true});
   if(error){ console.error(error); return; }
   postsEl.innerHTML="";
   data.forEach(p=>{
     const div=document.createElement("div");
     div.className="post";
-    div.innerHTML=`${escapeHtml(p.content)} <span class="time">${formatTime(p.created_at)}</span>`;
+    div.textContent=`${new Date(p.created_at).toLocaleString()} ${p.content}`;
     postsEl.appendChild(div);
   });
 }
 
-// スレ作成
-formThread.addEventListener("submit",async e=>{
-  e.preventDefault();
-  const title=inputTitle.value.trim();
-  const content=inputContent.value.trim();
-  if(!title||!content) return;
-  const {data:th,error:thErr}=await db.from("threads").insert([{title:title}]).select();
-  if(thErr){ console.error(thErr); alert("スレ作成失敗"); return; }
-  const threadId=th[0].id;
-  const userId=generateDailyId();
-  await db.from("posts").insert([{thread_id:threadId,content:`[${userId}] ${content}`}]);
-  inputTitle.value=""; inputContent.value="";
-  await loadThreads();
-});
-
 // レス投稿
-formPost.addEventListener("submit",async e=>{
+document.getElementById("postForm").addEventListener("submit",async e=>{
   e.preventDefault();
   const content=inputMsg.value.trim();
   if(!content) return;
+  if(content.length>200){ alert("200文字まで"); return; }
   const userId=generateDailyId();
-  const {error}=await db.from("posts").insert([{thread_id:currentThreadId,content:`[${userId}] ${content}`}]);
-  if(error){ console.error(error); alert("投稿失敗"); return; }
+  const { error }=await db.from("posts")
+    .insert([{thread_id:currentThreadId,content:`[${userId}] ${content}`}]);
+  if(error){ console.error(error); alert("失敗"); return; }
   inputMsg.value="";
   await loadPosts();
   await loadThreads();
 });
 
-// 戻る
-btnBack.addEventListener("click",()=>{
-  currentThreadId=null;
-  postView.style.display="none";
-  threadList.style.display="block";
-  window.scrollTo({top:0,behavior:"smooth"});
-});
+// スレ作成
+btnNewThread.onclick=async()=>{
+  const title=document.getElementById("threadTitle").value.trim();
+  const content=document.getElementById("threadContent").value.trim();
+  if(!title||!content){ alert("スレタイと本文必須"); return; }
+  const { data,error }=await db.from("threads").insert([{title}]).select("id");
+  if(error){ console.error(error); return; }
+  const tid=data[0].id;
+  const userId=generateDailyId();
+  await db.from("posts").insert([{thread_id:tid,content:`[${userId}] ${content}`}]);
+  document.getElementById("threadTitle").value="";
+  document.getElementById("threadContent").value="";
+  await loadThreads();
+};
 
-// 最新へジャンプ
-btnScroll.addEventListener("click",()=>{
-  if(postsEl.lastElementChild) postsEl.lastElementChild.scrollIntoView({behavior:"smooth",block:"end"});
-});
+// 最新レスへスクロール
+btnScroll.onclick=()=>{
+  if(postsEl.lastElementChild)
+    postsEl.lastElementChild.scrollIntoView({behavior:"smooth",block:"end"});
+};
 
-// リアルタイム
-db.channel("rt-posts")
+// リアルタイム更新
+db.channel("rt")
   .on("postgres_changes",{event:"INSERT",schema:"public",table:"posts"},payload=>{
-    if(payload?.new?.thread_id===currentThreadId) loadPosts();
+    if(payload.new.thread_id===currentThreadId) loadPosts();
     loadThreads();
-  }).subscribe();
+  })
+  .subscribe();
 
 loadThreads();
 </script>
