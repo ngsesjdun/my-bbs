@@ -2,199 +2,124 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>匿名掲示板</title>
+  <title>おんJ風掲示板</title>
   <style>
-    body { font-family: sans-serif; margin: 20px; }
-    .hidden { display: none; }
-    ul { list-style: none; padding: 0; }
-    li { margin: 8px 0; }
-    .thread-title { cursor: pointer; color: blue; text-decoration: underline; }
+    body { font-family: sans-serif; background: #f5f5f5; margin: 20px; }
+    .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 10px; }
+    .thread, .post { border-bottom: 1px solid #ddd; padding: 10px 0; }
+    .meta { color: gray; font-size: 0.9em; }
+    button { margin-top: 10px; padding: 5px 10px; }
+    textarea, input { width: 100%; padding: 5px; margin-top: 5px; }
   </style>
 </head>
 <body>
-  <h1>メンテナンス</h1></h1>
-
-  <!-- スレ一覧 -->
-  <div id="threadListView">
-    <h2>スレ一覧</h2>
-    <ul id="threadList"></ul>
-    <h3>新しいスレを立てる</h3>
-    <form id="newThreadForm">
-      <input type="text" id="newThreadTitle" placeholder="スレタイトル" required>
-      <button type="submit">作成</button>
-    </form>
-  </div>
-
-  <!-- スレ詳細 -->
-  <div id="threadDetailView" class="hidden">
-    <button id="backButton">← 戻る</button>
-    <h2 id="threadTitle"></h2>
-    <ul id="postList"></ul>
-
-    <form id="postForm">
-      <input type="text" id="postContent" placeholder="書き込み" required>
-      <button type="submit">投稿</button>
-    </form>
+  <div class="container">
+    <h1>おんJ風掲示板</h1>
+    <div id="view"></div>
   </div>
 
   <script type="module">
-    import { createClient } from "https://esm.sh/@supabase/supabase-js";
+    // shine
+    const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co";
+    const TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8";
+    const { createClient } = window.supabase;
+    const supabase = createClient(SUPABASE_URL, TEST);
 
-    const supabaseUrl = "https://owopzgeliyhgxpnywscy.supabase.co";
-    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8";
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // aho
+    const ngWords = ["爆破", "大麻", "殺す"];
 
-    const threadListView = document.getElementById("threadListView");
-    const threadDetailView = document.getElementById("threadDetailView");
-    const threadList = document.getElementById("threadList");
-    const postList = document.getElementById("postList");
-    const threadTitleEl = document.getElementById("threadTitle");
-    let currentThreadId = null;
-
-    // --- ユーザID（日付ごと固定） ---
-    function genUserHash() {
-      const today = new Date().toISOString().slice(0,10);
-      return btoa(today + "fixed").substring(0,4);
-    }
-
-    // --- XSS対策 ---
+    
     function escapeHTML(str) {
-      return str.replace(/[&<>"']/g, m => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[m]));
+      return str.replace(/[&<>"']/g, (m) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[m]));
     }
 
-    // --- NGワードチェック ---
-    const NG_WORDS = ["spam","bot","悪意","<script>"];
-    function containsNGWord(str) {
-      const s = str.toLowerCase();
-      return NG_WORDS.some(word => s.includes(word.toLowerCase()));
+  
+    function formatDate(dateStr) {
+      const d = new Date(dateStr);
+      return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,"0")}`;
     }
 
-    // --- レート制限 ---
-    const lastPostTime = {};
-    function canPost(userHash) {
-      const now = Date.now();
-      if (lastPostTime[userHash] && now - lastPostTime[userHash] < 60000) return false;
-      lastPostTime[userHash] = now;
-      return true;
+    
+    function checkNG(text) {
+      return ngWords.some(word => text.includes(word));
     }
-
-    // --- スレ一覧取得 ---
-    async function fetchThreads() {
-      const { data, error } = await supabase
-        .from("threads_with_activity")
-        .select("*")
-        .order("last_activity_at", { ascending: false });
-
-      if (error) {
-        console.error(error);
-        return;
-      }
-
-      threadList.innerHTML = "";
-      data.forEach(thread => {
-        const li = document.createElement("li");
-        li.innerHTML = `
-          <span class="thread-title" data-id="${thread.id}">
-            ${escapeHTML(thread.title)}
-          </span>
-          （レス数: ${thread.post_count}）
-        `;
-        threadList.appendChild(li);
-      });
-
-      document.querySelectorAll(".thread-title").forEach(el => {
-        el.onclick = () => openThread(el.dataset.id, el.textContent);
-      });
+    
+    
+    async function showThreads() {
+      const { data } = await supabase.from("threads").select("*").order("created_at", { ascending: false });
+      const el = document.getElementById("view");
+      el.innerHTML = `
+        <button onclick="showNewThreadForm()">新規スレ作成</button>
+        <h2>スレ一覧</h2>
+        ${data.map(t => `
+          <div class="thread">
+            <a href="#" onclick="showThread(${t.id})">${escapeHTML(t.title)}</a>
+            <div class="meta">${formatDate(t.created_at)}</div>
+          </div>
+        `).join("")}
+      `;
     }
-
-    // --- スレ詳細表示 ---
-    async function openThread(threadId, title) {
-      currentThreadId = threadId;
-      threadTitleEl.textContent = title;
-
-      const { data: posts, error } = await supabase
-        .from("posts")
-        .select("*")
-        .eq("thread_id", threadId)
-        .order("created_at", { ascending: true });
-
-      if (error) { console.error(error); return; }
-
-      postList.innerHTML = "";
-      posts.forEach(post => {
-        const li = document.createElement("li");
-        li.textContent = `${new Date(post.created_at).toLocaleTimeString()} ID:${post.user_hash} - ${escapeHTML(post.content)}`;
-        postList.appendChild(li);
-      });
-
-      threadListView.classList.add("hidden");
-      threadDetailView.classList.remove("hidden");
-    }
-
-    // --- 戻る ---
-    document.getElementById("backButton").onclick = () => {
-      threadDetailView.classList.add("hidden");
-      threadListView.classList.remove("hidden");
-      fetchThreads();
+    
+    window.showNewThreadForm = function() {
+      document.getElementById("view").innerHTML = `
+        <h2>新規スレ作成</h2>
+        <input id="title" placeholder="スレタイトル">
+        <textarea id="content" placeholder="本文"></textarea>
+        <button onclick="createThread()">作成</button>
+        <button onclick="showThreads()">戻る</button>
+      `;
     };
 
-    // --- スレ作成 ---
-    document.getElementById("newThreadForm").onsubmit = async (e) => {
-      e.preventDefault();
-      const title = document.getElementById("newThreadTitle").value.trim();
-      if (!title) return alert("タイトルを入力してください");
-      if (containsNGWord(title)) return alert("NGワードが含まれています");
+  
+    window.createThread = async function() {
+      const title = document.getElementById("title").value.trim();
+      const content = document.getElementById("content").value.trim();
+      if (!title || !content) return alert("空投稿は禁止や！");
+      if (checkNG(title) || checkNG(content)) return alert("NGワードが含まれています");
 
-      const { data, error } = await supabase
-        .from("threads")
-        .insert({ title })
-        .select()
-        .single();
+      const { data, error } = await supabase.from("threads").insert([{ title }]).select().single();
+      if (error) return alert("投稿失敗: " + error.message);
 
-      if (error) { console.error(error); return; }
-
-      document.getElementById("newThreadTitle").value = "";
-      fetchThreads();
+      await supabase.from("posts").insert([{ thread_id: data.id, content }]);
+      showThreads();
     };
 
-    // --- 投稿 ---
-    document.getElementById("postForm").onsubmit = async (e) => {
-      e.preventDefault();
-      const content = document.getElementById("postContent").value.trim();
-      const userHash = genUserHash();
-
-      if (!content) return alert("書き込みを入力してください");
-      if (containsNGWord(content)) return alert("NGワードが含まれています");
-      if (!canPost(userHash)) return alert("1分以内に連続投稿できません");
-
-      const { error } = await supabase.from("posts").insert({
-        thread_id: currentThreadId,
-        content,
-        user_hash: userHash
-      });
-
-      if (error) { console.error(error); return; }
-
-      document.getElementById("postContent").value = "";
-      openThread(currentThreadId, threadTitleEl.textContent);
+    
+    window.showThread = async function(id) {
+      const { data: thread } = await supabase.from("threads").select("*").eq("id", id).single();
+      const { data: posts } = await supabase.from("posts").select("*").eq("thread_id", id).order("created_at");
+      document.getElementById("view").innerHTML = `
+        <h2>${escapeHTML(thread.title)}</h2>
+        ${posts.map(p => `
+          <div class="post">
+            ${escapeHTML(p.content)}
+            <div class="meta">${formatDate(p.created_at)}</div>
+          </div>
+        `).join("")}
+        <textarea id="reply" placeholder="レスを書く"></textarea>
+        <button onclick="createPost(${id})">投稿</button>
+        <button onclick="showThreads()">戻る</button>
+      `;
     };
 
-    // --- リアルタイム自動更新 ---
-    supabase
-      .channel('realtime-posts')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, payload => {
-        fetchThreads();
-        if (currentThreadId && payload.new.thread_id == currentThreadId) {
-          openThread(currentThreadId, threadTitleEl.textContent);
-        }
-      })
-      .subscribe();
+    // レス投稿
+    window.createPost = async function(threadId) {
+      const content = document.getElementById("reply").value.trim();
+      if (!content) return alert("空投稿は禁止や！");
+      if (checkNG(content)) return alert("NGワードが含まれています");
 
-    fetchThreads();
+      const { error } = await supabase.from("posts").insert([{ thread_id: threadId, content }]);
+      if (error) return alert("投稿失敗: " + error.message);
+      showThread(threadId);
+    };
 
+    // 初期表示
+    showThreads();
   </script>
 
-  <!-- --- 何で見てんの？
-  -->
+  <!-- Supabase CDN -->
+  <script src="https://unpkg.com/@supabase/supabase-js"></script>
 </body>
 </html>
