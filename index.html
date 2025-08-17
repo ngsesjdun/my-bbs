@@ -60,8 +60,8 @@ button:active{ transform:translateY(1px); }
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
 const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co";
-const SUPABASE_KEY = "YOUR_ANON_KEY"; // 🔒 anon key
-const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPABASEKA = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8"; // 文字化け対抗
+const db = createClient(SUPABASE_URL, SUPABASEKA);
 
 const threadBox = document.getElementById("thread-box");
 const postsEl = document.getElementById("posts");
