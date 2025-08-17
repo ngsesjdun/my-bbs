@@ -1,171 +1,228 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>なんI</title>
 <style>
-  body { font-family: sans-serif; background: #f5f5f5; margin:0; }
-  header { background:#333; color:#fff; padding:10px; }
-  #threadList, #postArea { padding:10px; }
-  .thread { padding:8px; margin:5px 0; background:#fff; border:1px solid #ccc; cursor:pointer; }
-  .post { padding:6px; margin:4px 0; background:#fff; border-left:3px solid #999; }
-  #postForm, #threadForm { margin-top:10px; }
-  button { margin-top:5px; padding:5px 10px; }
-  #btnScroll { position:fixed; right:10px; bottom:10px; }
+  body{
+    font-family: メイリオ, Meiryo, "ＭＳ ゴシック", "Hiragino Kaku Gothic ProN","ヒラギノ角ゴ ProN W3", sans-serif;
+    background:#1c1c1c; color:#ddd; margin:0;
+  }
+  a{ color:#08f; text-decoration:none; }
+  #header{ background:#333; color:#fff; padding:8px 10px; text-align:center; font-weight:bold; }
+  #wrap{ max-width:640px; margin:0 auto; padding:10px; }
+
+  /* スレ作成 */
+  #new-thread{ margin:10px 0; display:flex; gap:6px; }
+  #new-thread input{ flex:1; padding:8px; background:#222; border:1px solid #444; color:#ddd; border-radius:4px; }
+  button{ padding:8px 10px; background:#444; color:#eee; border:1px solid #666; border-radius:6px; }
+  button:active{ transform:translateY(1px); }
+
+  /* スレ一覧 */
+  #thread-box{ background:#2b2b2b; border-radius:6px; overflow:hidden; }
+  .thread-row{ padding:8px 10px; border-bottom:1px solid #555; }
+  .thread-row:last-child{ border-bottom:none; }
+  .thread-link{ display:inline-block; }
+  .thread-meta{ color:#999; font-size:.85em; margin-left:6px; }
+
+  /* スレ表示 */
+  #thread-view{ margin-top:12px; background:#2b2b2b; border-radius:6px; }
+  #thread-title{ padding:8px 10px; border-bottom:1px solid #555; font-weight:bold; }
+  #posts{ max-height:60vh; overflow-y:auto; padding:6px 8px; }
+  .post{ padding:6px 4px; border-bottom:1px solid #555; white-space:pre-wrap; word-break:break-word; }
+  .post:last-child{ border-bottom:none; }
+  .no{ color:red; font-weight:bold; margin-right:6px; }
+  .time{ color:#999; font-size:.85em; }
+
+  /* 投稿フォーム */
+  #post-form-wrap{ padding:8px 10px; border-top:1px solid #555; }
+  #post-form{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  #post-message{ flex:1; min-width:200px; padding:8px; background:#222; border:1px solid #444; color:#ddd; border-radius:4px; }
+
+  .aa-measure{ position:absolute; visibility:hidden; display:none; width:0; height:0; padding:0; border:none; }
 </style>
 </head>
 <body>
-<header><h1>なんでも実況ジュピター</h1></header>
-
-<!-- スレ一覧 -->
-<section id="threadList"></section>
-
-<!-- スレ作成フォーム -->
-<section id="threadForm">
-  <h2>スレ立て</h2>
-  <input id="threadTitle" placeholder="スレタイ" style="width:100%;"><br>
-  <textarea id="threadContent" placeholder="本文" style="width:100%;height:60px;"></textarea><br>
-  <button id="btnNewThread">スレを立てる</button>
-</section>
-
-<!-- スレ表示 -->
-<section id="postArea" style="display:none;">
-  <button id="btnBack">← スレ一覧に戻る</button>
-  <h2 id="currentTitle"></h2>
-  <div id="posts"></div>
-
-  <!-- レス投稿フォーム -->
-  <form id="postForm">
-    <textarea id="inputMsg" placeholder="レスを書く…" style="width:100%;height:60px;"></textarea><br>
-    <button type="submit">書き込む</button>
-  </form>
-</section>
-
-<!-- 最新へスクロール -->
-<button id="btnScroll" style="display:none;">↓ 最新へ</button>
+  <div id="header">なんでも実況ジュピター</div>
+  <div id="wrap">
+    <div id="new-thread">
+      <input id="thread-title-input" type="text" placeholder="スレッドタイトル" />
+      <button id="create-thread" type="button">スレ作成</button>
+    </div>
+    <div id="thread-box"></div>
+    <div id="thread-view" style="display:none;">
+      <div id="thread-title"></div>
+      <div id="posts"></div>
+      <div id="post-form-wrap">
+        <form id="post-form" onsubmit="return false;">
+          <input id="post-message" type="text" placeholder="本文（posts.content に保存）" />
+          <button id="send" type="button">書き込む</button>
+        </form>
+        <button id="back" type="button">← スレ一覧へ</button>
+      </div>
+    </div>
+    <span class="aa-measure">AA</span>
+  </div>
 
 <script type="module">
-import { createClient } from "https://esm.sh/@supabase/supabase-js";
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8";
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const db = createClient("https://owopzgeliyhgxpnywscy.supabase.co","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8");
+const threadBox = document.getElementById("thread-box");
+const postsEl   = document.getElementById("posts");
+const viewWrap  = document.getElementById("thread-view");
+const viewTitle = document.getElementById("thread-title");
+const newTitle  = document.getElementById("thread-title-input");
+const btnCreate = document.getElementById("create-thread");
+const inputMsg  = document.getElementById("post-message");
+const btnSend   = document.getElementById("send");
+const btnBack   = document.getElementById("back");
 
-const threadListEl=document.getElementById("threadList");
-const postsEl=document.getElementById("posts");
-const postArea=document.getElementById("postArea");
-const currentTitle=document.getElementById("currentTitle");
-const btnBack=document.getElementById("btnBack");
-const btnNewThread=document.getElementById("btnNewThread");
-const btnScroll=document.getElementById("btnScroll");
-const inputMsg=document.getElementById("inputMsg");
+let currentThreadId = null;
+let lastPostTime = 0;
 
-let currentThreadId=null;
+// 0時まで固定の4文字ID
+let currentId = null;
+let lastIdDate = null;
+function generateDailyId() {
+  const today = new Date().toISOString().slice(0,10);
+  if(currentId && lastIdDate === today) return currentId;
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let id = '';
+  for(let i=0;i<4;i++) id += chars.charAt(Math.floor(Math.random()*chars.length));
+  currentId = id;
+  lastIdDate = today;
+  return id;
+}
+generateDailyId();
 
-// 日替わりID
-function generateDailyId(){
-  const today=new Date().toISOString().split("T")[0];
-  return Math.random().toString(36).substring(2,6)+"-"+today;
+const fmt = (ts) => {
+  if(!ts) return "";
+  const d = new Date(ts);
+  if(isNaN(d)) return "";
+  const pad = (n,l=2)=>String(n).padStart(l,"0");
+  return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3,"0")}`;
 }
 
-// スレ一覧読み込み
 async function loadThreads(){
-  const { data,error } = await db.from("threads")
-    .select("id,title,created_at,posts(count,created_at)")
-    .order("last_posted_at",{ascending:false});
+  const { data, error } = await db.from("threads").select("*").order("created_at", { ascending:false });
   if(error){ console.error(error); return; }
-
-  threadListEl.innerHTML="";
-  data.forEach(t=>{
-    const div=document.createElement("div");
-    div.className="thread";
-    const count=t.posts?.[0]?.count ?? 0;
-    const last=new Date(t.last_posted_at||t.created_at).toLocaleString();
-    div.textContent=`${t.title} (${count}レス) [最終:${last}]`;
-    div.onclick=()=>openThread(t.id,t.title);
-    threadListEl.appendChild(div);
+  threadBox.innerHTML = "";
+  (data||[]).forEach(th=>{
+    const row = document.createElement("div");
+    row.className = "thread-row";
+    row.dataset.threadId = th.id; // bump用
+    const a = document.createElement("a");
+    a.className = "thread-link";
+    a.href="#thread-view";
+    a.textContent = th.title;
+    a.onclick = (e)=>{ e.preventDefault(); openThread(th.id, th.title); };
+    const meta = document.createElement("span");
+    meta.className="thread-meta";
+    meta.textContent=fmt(th.created_at);
+    row.appendChild(a); row.appendChild(meta);
+    threadBox.appendChild(row);
   });
 }
 
-// スレを開く
-async function openThread(id,title){
-  currentThreadId=id;
-  currentTitle.textContent=title;
-  threadListEl.style.display="none";
-  document.getElementById("threadForm").style.display="none";
-  postArea.style.display="block";
-  btnScroll.style.display="block";
-  await loadPosts();
-}
-
-// スレ一覧に戻る
-btnBack.onclick=()=>{
-  currentThreadId=null;
-  postArea.style.display="none";
-  btnScroll.style.display="none";
-  threadListEl.style.display="block";
-  document.getElementById("threadForm").style.display="block";
-  loadThreads();
-};
-
-// レス読み込み
-async function loadPosts(){
-  if(!currentThreadId) return;
-  const { data,error } = await db.from("posts")
-    .select("id,content,created_at")
-    .eq("thread_id",currentThreadId)
-    .order("created_at",{ascending:true});
-  if(error){ console.error(error); return; }
-  postsEl.innerHTML="";
-  data.forEach(p=>{
-    const div=document.createElement("div");
-    div.className="post";
-    div.textContent=`${new Date(p.created_at).toLocaleString()} ${p.content}`;
-    postsEl.appendChild(div);
-  });
-}
-
-// レス投稿
-document.getElementById("postForm").addEventListener("submit",async e=>{
-  e.preventDefault();
-  const content=inputMsg.value.trim();
-  if(!content) return;
-  if(content.length>200){ alert("200文字まで"); return; }
-  const userId=generateDailyId();
-  const { error }=await db.from("posts")
-    .insert([{thread_id:currentThreadId,content:`[${userId}] ${content}`}]);
-  if(error){ console.error(error); alert("失敗"); return; }
-  inputMsg.value="";
-  await loadPosts();
+btnCreate.addEventListener("click", async ()=>{
+  const title = newTitle.value.trim();
+  if(!title){ alert("タイトルを入れて"); return; }
+  const { data, error } = await db.from("threads").insert([{ title }]).select().limit(1).maybeSingle();
+  if(error){ console.error(error); alert("スレ作成失敗"); return; }
+  newTitle.value = "";
   await loadThreads();
+  if(data?.id) openThread(data.id, data.title);
 });
 
-// スレ作成
-btnNewThread.onclick=async()=>{
-  const title=document.getElementById("threadTitle").value.trim();
-  const content=document.getElementById("threadContent").value.trim();
-  if(!title||!content){ alert("スレタイと本文必須"); return; }
-  const { data,error }=await db.from("threads").insert([{title}]).select("id");
+async function openThread(id,title){
+  currentThreadId=id;
+  viewTitle.textContent=title;
+  viewWrap.style.display="block";
+  document.getElementById("thread-view").scrollIntoView({ behavior:"smooth", block:"start" });
+  await loadPosts();
+}
+
+async function loadPosts(){
+  if(!currentThreadId) return;
+  const { data, error } = await db.from("posts")
+    .select("id,content,created_at,thread_id")
+    .eq("thread_id", currentThreadId)
+    .order("created_at", { ascending:true });
   if(error){ console.error(error); return; }
-  const tid=data[0].id;
-  const userId=generateDailyId();
-  await db.from("posts").insert([{thread_id:tid,content:`[${userId}] ${content}`}]);
-  document.getElementById("threadTitle").value="";
-  document.getElementById("threadContent").value="";
-  await loadThreads();
-};
+  postsEl.innerHTML = "";
+  (data||[]).forEach((p,i)=>{
+    const div = document.createElement("div");
+    div.className="post";
 
-// 最新レスへスクロール
-btnScroll.onclick=()=>{
-  if(postsEl.lastElementChild)
-    postsEl.lastElementChild.scrollIntoView({behavior:"smooth",block:"end"});
-};
+    const no = document.createElement("span");
+    no.className="no";
+    no.textContent = i+1;
+    const content = document.createElement("span");
+    content.textContent = p.content || "";
+    const time = document.createElement("span");
+    time.className="time";
 
-// リアルタイム更新
-db.channel("rt")
-  .on("postgres_changes",{event:"INSERT",schema:"public",table:"posts"},payload=>{
-    if(payload.new.thread_id===currentThreadId) loadPosts();
-    loadThreads();
-  })
-  .subscribe();
+    const d = new Date(p.created_at);
+    if(!isNaN(d)) {
+      const pad = (n,l=2)=>String(n).padStart(l,"0");
+      time.textContent = `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3,"0")}`;
+    }
+
+    div.appendChild(no);
+    div.appendChild(document.createTextNode(" "));
+    div.appendChild(content);
+    div.appendChild(document.createElement("br"));
+    div.appendChild(time);
+
+    postsEl.appendChild(div);
+  });
+
+  postsEl.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+btnSend.addEventListener("click", async ()=>{
+  const now = Date.now();
+  if(now - lastPostTime < 2000){ alert("連投は2秒空けてください"); return; }
+  if(!currentThreadId) return;
+  let content = inputMsg.value.trim();
+  if(!content) return;
+  if(content.length > 200){ alert("本文は200文字までです"); return; }
+
+  const userId = generateDailyId();
+  const { error } = await db.from("posts").insert([{ thread_id: currentThreadId, content:`[${userId}] ${content}` }]);
+  if(error){ console.error(error); alert("投稿失敗"); return; }
+  inputMsg.value = "";
+  lastPostTime = now;
+  await loadPosts();
+});
+
+btnBack.addEventListener("click", ()=>{
+  currentThreadId = null;
+  viewWrap.style.display="none";
+  window.scrollTo({top:0, behavior:"smooth"});
+});
+
+// bump機能付きリアルタイム反映
+db.channel("rt-posts")
+  .on("postgres_changes",{event:"INSERT",schema:"public",table:"posts"}, payload=>{
+    if(payload?.new?.thread_id === currentThreadId){
+      loadPosts();
+    }
+    bumpThread(payload?.new?.thread_id);
+  }).subscribe();
+
+function bumpThread(threadId){
+  const target = threadBox.querySelector(`.thread-row[data-thread-id='${threadId}']`);
+  if(target){
+    threadBox.prepend(target); // 先頭に移動
+  }else{
+    loadThreads(); // まだ一覧にないなら再ロード
+  }
+}
 
 loadThreads();
 </script>
