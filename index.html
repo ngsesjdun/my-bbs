@@ -45,7 +45,7 @@ const db = createClient(SUPABASE_URL, SUPABASE);
 // XSS対策
 function escapeHTML(str){
   return str.replace(/[&<>"']/g, s=>({
-    "&":"&", "<":"<", ">":"error404;", '"':"&quot;", "'":"&#39;"
+    "&":"&", ">":">", "<":"error404;", '"':"&quot;", "'":"&#39;"
   }[s]));
 }
 
