@@ -13,7 +13,8 @@
   <!-- スレ一覧 -->
   <div id="list-view">
     <div id="new-thread">
-      <input id="thread-title-input" type="text" placeholder="スレッドタイトル" />
+      <input id="thread-title-input" type="text" placeholder="スレッドタイトル" /><br>
+      <textarea id="thread-body-input" placeholder="本文（最初のレス）" rows="2" style="width:100%;"></textarea>
       <button id="create-thread" type="button">スレ作成</button>
     </div>
     <div id="thread-box"></div>
@@ -25,14 +26,10 @@
     <div id="posts"></div>
     <div id="post-form-wrap" style="margin-top:4px;">
       <form id="post-form" onsubmit="return false;">
-        <!-- 本文入力を textarea に変更 -->
         <textarea id="post-message" placeholder="本文（改行できます）" rows="3" style="width:100%;"></textarea>
         <div style="margin-top:4px; display:flex; justify-content:space-between;">
-
-          
-          
           <button id="send" type="button">書き込む</button>
-<br><button id="back" type="button">← スレ一覧へ</button>
+          <button id="back" type="button">← スレ一覧へ</button>
         </div>
       </form>
     </div>
@@ -42,8 +39,26 @@
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co";
-const SUPABASE = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8"; //文字化け対策
+const SUPABASE = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8";
 const db = createClient(SUPABASE_URL, SUPABASE);
+
+// XSS対策
+function escapeHTML(str){
+  return str.replace(/[&<>"']/g, s=>({
+    "&":"&", "<":"<", ">":"error404;", '"':"&quot;", "'":"&#39;"
+  }[s]));
+}
+
+// Discord風文字装飾
+function parseDecorations(str){
+  str = escapeHTML(str);
+  str = str.replace(/!fontcolor=([a-zA-Z#0-9]+)\s(.+?)(?=$|\n)/g, (_,c,text)=>`<span style="color:${c}">${text}</span>`);
+  str = str.replace(/!bgcolor=([a-zA-Z#0-9]+)\s(.+?)(?=$|\n)/g, (_,c,text)=>`<span style="background-color:${c}">${text}</span>`);
+  str = str.replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
+  str = str.replace(/\*(.+?)\*/g,"<i>$1</i>");
+  str = str.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,`<a href="$2" target="_blank">$1</a>`);
+  return str;
+}
 
 const listView  = document.getElementById("list-view");
 const threadBox = document.getElementById("thread-box");
@@ -51,6 +66,7 @@ const postsEl   = document.getElementById("posts");
 const viewWrap  = document.getElementById("thread-view");
 const viewTitle = document.getElementById("thread-title");
 const newTitle  = document.getElementById("thread-title-input");
+const newBody   = document.getElementById("thread-body-input");
 const btnCreate = document.getElementById("create-thread");
 const inputMsg  = document.getElementById("post-message");
 const btnSend   = document.getElementById("send");
@@ -83,12 +99,12 @@ function fmt(ts){
          `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-// スレ一覧読み込み
+// スレ一覧
 async function loadThreads(){
   const { data, error } = await db.from("threads").select("*").order("created_at",{ascending:false});
   if(error){ console.error(error); return; }
   threadBox.innerHTML="";
-  (data||[]).forEach(th=>{
+  for(const th of (data||[])){
     const row = document.createElement("div");
     row.style.border = "1px solid #000";
     row.style.margin = "2px 0";
@@ -98,43 +114,60 @@ async function loadThreads(){
     a.href = "?thread="+th.id;
     a.style.color = "blue";
     a.style.textDecoration = "none";
-    a.textContent = th.title;
+    a.textContent = escapeHTML(th.title);
     a.onclick = e => { e.preventDefault(); openThread(th.id, th.title); };
 
-    const meta = document.createElement("span");
+    // スレ作成時の本文（初回レス）
+    const firstPost = await db.from("posts")
+      .select("content").eq("thread_id", th.id).order("created_at",{ascending:true}).limit(1).maybeSingle();
+    const snippet = firstPost.data ? firstPost.data.content.replace(/^\[[A-Z0-9]{4}\]\s*/,'') : "";
+
+    const meta = document.createElement("div");
     meta.style.color="#000";
     meta.style.fontSize="12px";
-    meta.style.marginLeft="6px";
-    meta.textContent = fmt(th.created_at);
+    meta.style.marginTop="2px";
+    meta.innerHTML = parseDecorations(snippet);
 
     row.appendChild(a);
     row.appendChild(meta);
     threadBox.appendChild(row);
-  });
+  }
 }
 
 // スレ作成
 btnCreate.addEventListener("click", async ()=>{
   const title = newTitle.value.trim();
+  const body  = newBody.value.trim();
   if(!title){ alert("タイトルを入れて"); return; }
-  const { data, error } = await db.from("threads").insert([{ title }]).select().limit(1).maybeSingle();
-  if(error){ console.error(error); alert("スレ作成失敗"); return; }
+  if(!body){ alert("本文を入れて"); return; }
+
+  // threads にタイトルだけ追加
+  const { data: thData, error: thError } = await db.from("threads").insert([{ title }]).select().limit(1).maybeSingle();
+  if(thError){ console.error(thError); alert("スレ作成失敗"); return; }
+  const threadId = thData.id;
+
+  // 初回本文を posts に追加
+  const userId = generateDailyId();
+  const { error: postError } = await db.from("posts").insert([{ thread_id: threadId, content:`[${userId}] ${body}` }]);
+  if(postError){ console.error(postError); alert("初回本文投稿失敗"); return; }
+
   newTitle.value = "";
+  newBody.value = "";
   await loadThreads();
-  if(data?.id) openThread(data.id, data.title);
+  openThread(threadId, title);
 });
 
-// スレ詳細表示
+// スレ詳細
 async function openThread(id,title){
   currentThreadId=id;
-  viewTitle.textContent = title;
+  viewTitle.textContent = escapeHTML(title);
   listView.style.display="none";
   viewWrap.style.display="block";
   history.replaceState(null,"",`?thread=${id}`);
   await loadPosts();
 }
 
-// 投稿読み込み
+// 投稿一覧
 async function loadPosts(){
   if(!currentThreadId) return;
   const { data, error } = await db.from("posts")
@@ -153,7 +186,6 @@ async function loadPosts(){
     const userId = userIdMatch ? userIdMatch[1] : '----';
     const msg = userIdMatch ? p.content.replace(/^\[[A-Z0-9]{4}\]\s*/,'') : p.content;
 
-    // ヘッダ
     const header = document.createElement("div");
     const nameSpan = document.createElement("span");
     nameSpan.style.color = "green";
@@ -162,9 +194,8 @@ async function loadPosts(){
     header.appendChild(nameSpan);
     header.appendChild(document.createTextNode(`：${fmt(p.created_at)} ID:${userId}`));
 
-    // 本文（改行対応）
     const body = document.createElement("div");
-    body.innerHTML = msg.replace(/\n/g,"<br>");
+    body.innerHTML = parseDecorations(msg).replace(/\n/g,"<br>");
     body.style.marginLeft = "1em";
 
     div.appendChild(header);
@@ -203,9 +234,8 @@ db.channel("rt-posts")
     if(payload?.new?.thread_id===currentThreadId) loadPosts();
   }).subscribe();
 
+// 初期読み込み
 loadThreads();
-
-// 直リンク対応
 const urlParams = new URLSearchParams(window.location.search);
 const threadId = urlParams.get("thread");
 if(threadId){
