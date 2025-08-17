@@ -44,13 +44,6 @@
     const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8";
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    <script type="module">
-import { createClient } from "https://esm.sh/@supabase/supabase-js";
-
-// Supabaseの設定
-const supabaseUrl = "https://YOUR_PROJECT.supabase.co";  // ←置き換え
-const supabaseKey = "YOUR_PUBLIC_ANON_KEY";              // ←置き換え
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function fetchThreads() {
   const { data, error } = await supabase
