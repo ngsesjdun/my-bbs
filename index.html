@@ -107,25 +107,46 @@ const fmt = (ts) => {
   return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3,"0")}`;
 }
 
-async function loadThreads(){
-  const { data, error } = await db.from("threads").select("*").order("created_at", { ascending:false });
+async function loadPosts(){
+  if(!currentThreadId) return;
+  const { data, error } = await db.from("posts")
+    .select("id,content,created_at,thread_id")
+    .eq("thread_id", currentThreadId)
+    .order("created_at", { ascending:true });
   if(error){ console.error(error); return; }
-  threadBox.innerHTML = "";
-  (data||[]).forEach(th=>{
-    const row = document.createElement("div");
-    row.className = "thread-row";
-    const a = document.createElement("a");
-    a.className = "thread-link";
-    a.href="#thread-view";
-    a.textContent = th.title;
-    a.onclick = (e)=>{ e.preventDefault(); openThread(th.id, th.title); };
-    const meta = document.createElement("span");
-    meta.className="thread-meta";
-    meta.textContent=fmt(th.created_at);
-    row.appendChild(a); row.appendChild(meta);
-    threadBox.appendChild(row);
+  postsEl.innerHTML = "";
+  (data||[]).forEach((p,i)=>{
+    const div = document.createElement("div");
+    div.className="post";
+
+    const no = document.createElement("span");
+    no.className="no";
+    no.textContent = i+1;
+    const content = document.createElement("span");
+    content.textContent = p.content || "";
+    const time = document.createElement("span");
+    time.className="time";
+
+    const d = new Date(p.created_at);
+    if(!isNaN(d)) {
+      const pad = (n,l=2)=>String(n).padStart(l,"0");
+      time.textContent = `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3,"0")}`;
+    }
+
+    div.appendChild(no);
+    div.appendChild(document.createTextNode(" "));
+    div.appendChild(content);
+    div.appendChild(document.createElement("br"));
+    div.appendChild(time);
+
+    postsEl.appendChild(div);
   });
+
+  // 新しい投稿（最後の要素）を上にスクロール
+  const firstPost = postsEl.firstElementChild;
+  if(firstPost) firstPost.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
 
 btnCreate.addEventListener("click", async ()=>{
   const title = newTitle.value.trim();
