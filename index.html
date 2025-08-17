@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>なんI ホームページ</title>
+<title>なんI 安全版 bump対応</title>
 <style>
 body{ font-family: メイリオ,Meiryo,"ＭＳ ゴシック",sans-serif; background:#1c1c1c; color:#ddd; margin:0; }
 a{ color:#08f; text-decoration:none; }
@@ -59,9 +59,10 @@ button:active{ transform:translateY(1px); }
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
+// KEYは文字化け対策　絶対に消すな
 const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co";
-const SUPABASEKA = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8"; // 文字化け対抗
-const db = createClient(SUPABASE_URL, SUPABASEKA);
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8";
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const threadBox = document.getElementById("thread-box");
 const postsEl = document.getElementById("posts");
@@ -92,11 +93,11 @@ const fmt = ts=>{
   return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-// スレ一覧を取得し bump順で表示
+// スレ一覧を取得して表示（最新レス順に bump）
 async function loadThreads(){
   const { data,error } = await db.from("threads")
-    .select("id,title,created_at,latest_post")
-    .order("latest_post",{ascending:false});
+    .select("id,title,created_at")
+    .order("created_at",{ascending:true});
   if(error){ console.error(error); return; }
   threadBox.innerHTML="";
   (data||[]).forEach(th=>{
@@ -116,23 +117,28 @@ async function loadThreads(){
   });
 }
 
-// スレ作成
+// スレ作成（本文 >>1 も追加）
 btnCreate.addEventListener("click", async ()=>{
   const title = newTitle.value.trim();
   const body = newBody.value.trim();
   if(!title){ alert("タイトルを入れて"); return; }
   if(!body){ alert("本文を入れて"); return; }
 
-  const { data, error } = await db.from("threads").insert([{title}]).select().maybeSingle();
-  if(error){ console.error(error); alert("スレ作成失敗"); return; }
+  try{
+    const { data, error } = await db.from("threads").insert([{title}]).select().maybeSingle();
+    if(error || !data) throw error||"no data";
 
-  const threadId = data.id;
-  const userId = generateDailyId();
-  await db.from("posts").insert([{thread_id:threadId, content:`[${userId}] ${body}`}]);
+    const threadId = data.id;
+    const userId = generateDailyId();
+    await db.from("posts").insert([{thread_id:threadId, content:`[${userId}] ${body}`}]);
 
-  newTitle.value=""; newBody.value="";
-  await loadThreads();
-  openThread(threadId,title);
+    newTitle.value=""; newBody.value="";
+    await loadThreads();
+    openThread(threadId,title);
+  }catch(e){
+    console.error(e);
+    alert("スレ作成失敗");
+  }
 });
 
 // スレ表示
@@ -175,13 +181,13 @@ btnSend.addEventListener("click", async ()=>{
   if(content.length>200){ alert("本文は200文字まで"); return; }
 
   const userId = generateDailyId();
-  const { error } = await db.from("posts").insert([{ thread_id: currentThreadId, content:`[${userId}] ${content}` }]);
-  if(error){ console.error(error); alert("投稿失敗"); return; }
-
-  inputMsg.value="";
-  lastPostTime = now;
-  await loadPosts();
-  bumpThread(currentThreadId);
+  try{
+    await db.from("posts").insert([{ thread_id: currentThreadId, content:`[${userId}] ${content}` }]);
+    inputMsg.value="";
+    lastPostTime = now;
+    await loadPosts();
+    bumpThread(currentThreadId);
+  }catch(e){ console.error(e); alert("投稿失敗"); }
 });
 
 // スレを一覧の先頭に移動（最新レス順）
