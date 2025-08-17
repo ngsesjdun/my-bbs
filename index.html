@@ -7,27 +7,27 @@
 <style>
   body{
     font-family: メイリオ, Meiryo, "ＭＳ ゴシック", "Hiragino Kaku Gothic ProN","ヒラギノ角ゴ ProN W3", sans-serif;
-    background:#1c1c1c; color:#ddd; margin:0;
+    background:#444; color:#ddd; margin:0;
   }
   a{ color:#08f; text-decoration:none; }
-  #header{ background:#333; color:#fff; padding:8px 10px; text-align:center; font-weight:bold; }
-  #wrap{ max-width:640px; margin:0 auto; padding:10px; }
+   background:#333; color:#fff; padding:8px 10px; text-align:center; font-weight:bold; }
+   max-width:640px; margin:0 auto; padding:10px; }
 
   /* スレ作成 */
-  #new-thread{ margin:10px 0; display:flex; gap:6px; }
-  #new-thread input{ flex:1; padding:8px; background:#222; border:1px solid #444; color:#ddd; border-radius:4px; }
-  button{ padding:8px 10px; background:#444; color:#eee; border:1px solid #666; border-radius:6px; }
+   margin:10px 0; display:flex; gap:6px; }
+   input{ flex:1; padding:8px; background:#333; border:1px solid #555; color:#ddd; border-radius:4px; }
+  button{ padding:8px 10px; background:#555; color:#eee; border:1px solid #777; border-radius:6px; }
   button:active{ transform:translateY(1px); }
 
   /* スレ一覧 */
-  #thread-box{ background:#2b2b2b; border-radius:6px; overflow:hidden; }
+   background:#3a3a3a; border-radius:6px; overflow:hidden; }
   .thread-row{ padding:8px 10px; border-bottom:1px solid #555; }
   .thread-row:last-child{ border-bottom:none; }
   .thread-link{ display:inline-block; }
-  .thread-meta{ color:#999; font-size:.85em; margin-left:6px; }
+  .thread-meta{ color:#aaa; font-size:.85em; margin-left:6px; }
 
   /* スレ表示 */
-  #thread-view{ margin-top:12px; background:#2b2b2b; border-radius:6px; }
+  #thread-view{ margin-top:12px; background:#3a3a3a; border-radius:6px; }
   #thread-title{ padding:8px 10px; border-bottom:1px solid #555; font-weight:bold; }
   #posts{ max-height:60vh; overflow-y:auto; padding:6px 8px; }
   .post{ padding:6px 4px; border-bottom:1px solid #555; white-space:pre-wrap; word-break:break-word; }
@@ -36,166 +36,179 @@
   /* 投稿フォーム */
   #post-form-wrap{ padding:8px 10px; border-top:1px solid #555; }
   #post-form{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
-  #post-message{ flex:1; min-width:200px; padding:8px; background:#222; border:1px solid #444; color:#ddd; border-radius:4px; }
+  #post-message{ flex:1; min-width:200px; padding:8px; background:#333; border:1px solid #555; color:#ddd; border-radius:4px; }
 
   .aa-measure{ position:absolute; visibility:hidden; display:none; width:0; height:0; padding:0; border:none; }
+
+  /* レス番号、日時、IDを緑色にするための追加スタイル */
+  .post-meta {
+    color: #00ff00; /* 緑色に設定 */
+  }
 </style>
+
+
 </head>
 <body>
-  <div id="header">なんでも実況ジュピター</div>
-  <div id="wrap">
-    <div id="new-thread">
-      <input id="thread-title-input" type="text" placeholder="スレッドタイトル" />
-      <button id="create-thread" type="button">スレ作成</button>
+<div id="header">なんでも実況ジュピター</div>
+<div id="wrap">
+  <div id="new-thread">
+    <input id="thread-title-input" type="text" placeholder="スレッドタイトル" />
+    <button id="create-thread" type="button">スレ作成</button>
+  </div>
+  <div id="thread-box"></div>
+
+  <div id="thread-view">
+    <div id="thread-title"></div>
+    <div id="posts"></div>
+    <div id="post-form-wrap">
+      <input id="post-message" type="text" placeholder="本文" />
+      <button id="send" type="button">書き込む</button>
+      <button id="back" type="button">← スレ一覧へ</button>
     </div>
-    <div id="thread-box"></div>
-    <div id="thread-view" style="display:none;">
-      <div id="thread-title"></div>
-      <div id="posts"></div>
-      <div id="post-form-wrap">
-        <form id="post-form" onsubmit="return false;">
-          <input id="post-message" type="text" placeholder="本文（posts.content に保存）" />
-          <button id="send" type="button">書き込む</button>
-        </form>
-        <button id="back" type="button">← スレ一覧へ</button>
-      </div>
-    </div>
-    <span class="aa-measure">AA</span>
   </div>
 
+  <span class="aa-measure">AA</span>
+</div>
+
 <script type="module">
-  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
-  const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co";
-  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8";
-  const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8"; // 適宜置き換え
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  const threadBox = document.getElementById("thread-box");
-  const postsEl   = document.getElementById("posts");
-  const viewWrap  = document.getElementById("thread-view");
-  const viewTitle = document.getElementById("thread-title");
-  const newTitle  = document.getElementById("thread-title-input");
-  const btnCreate = document.getElementById("create-thread");
-  const inputMsg  = document.getElementById("post-message");
-  const btnSend   = document.getElementById("send");
-  const btnBack   = document.getElementById("back");
+const threadBox = document.getElementById("thread-box");
+const postsEl   = document.getElementById("posts");
+const viewWrap  = document.getElementById("thread-view");
+const viewTitle = document.getElementById("thread-title");
+const newTitle  = document.getElementById("thread-title-input");
+const btnCreate = document.getElementById("create-thread");
+const inputMsg  = document.getElementById("post-message");
+const btnSend   = document.getElementById("send");
+const btnBack   = document.getElementById("back");
 
-  let currentThreadId = null;
-  let lastPostTime = 0;
+let currentThreadId = null;
+let lastPostTime = 0;
 
-  let currentId = null;
-  let lastIdDate = null;
-  function generateDailyId() {
-    const today = new Date().toISOString().slice(0,10);
-    if(currentId && lastIdDate === today) return currentId;
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let id = '';
-    for(let i=0;i<4;i++) id += chars.charAt(Math.floor(Math.random()*chars.length));
-    currentId = id;
-    lastIdDate = today;
-    return id;
-  }
-  generateDailyId();
+let currentId = null;
+let lastIdDate = null;
+function generateDailyId() {
+  const today = new Date().toISOString().slice(0,10);
+  if(currentId && lastIdDate === today) return currentId;
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let id = '';
+  for(let i=0;i<4;i++) id += chars.charAt(Math.floor(Math.random()*chars.length));
+  currentId = id;
+  lastIdDate = today;
+  return id;
+}
+generateDailyId();
 
-  function escapeHTML(str){
-    return str.replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
-  }
+// XSS対策
+function escapeHTML(str){
+  return str.replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+}
 
-  function fmt(ts){
-    if(!ts) return "";
-    const d = (ts instanceof Date) ? ts : new Date(ts);
-    if(isNaN(d)) return "";
-    const w = ['日','月','火','水','木','金','土'][d.getDay()];
-    const pad = (n,l=2)=>String(n).padStart(l,'0');
-    return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}(${w}) `+
-           `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())},${pad(d.getMilliseconds(),3)}`;
-  }
+// 時刻整形
+function fmt(ts){
+  if(!ts) return "";
+  const d = (ts instanceof Date) ? ts : new Date(ts);
+  if(isNaN(d)) return "";
+  const w = ['日','月','火','水','木','金','土'][d.getDay()];
+  const pad = (n,l=2)=>String(n).padStart(l,'0');
+  return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}(${w}) `+
+         `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())},${pad(d.getMilliseconds(),3)}`;
+}
 
-  async function loadThreads(){
-    const { data, error } = await db.from("threads").select("*").order("created_at",{ascending:false});
-    if(error){ console.error(error); return; }
-    threadBox.innerHTML="";
-    (data||[]).forEach(th=>{
-      const row=document.createElement("div");
-      row.className="thread-row";
-      const a=document.createElement("a");
-      a.className="thread-link";
-      a.href="#thread-view";
-      a.textContent = escapeHTML(th.title);
-      a.onclick = e=>{ e.preventDefault(); openThread(th.id, th.title); };
-      const meta=document.createElement("span");
-      meta.className="thread-meta";
-      meta.textContent = fmt(th.created_at);
-      row.appendChild(a); row.appendChild(meta);
-      threadBox.appendChild(row);
-    });
-  }
-
-  btnCreate.addEventListener("click", async ()=>{
-    const title = newTitle.value.trim();
-    if(!title){ alert("タイトルを入れて"); return; }
-    const { data, error } = await db.from("threads").insert([{ title }]).select().limit(1).maybeSingle();
-    if(error){ console.error(error); alert("スレ作成失敗"); return; }
-    newTitle.value = "";
-    await loadThreads();
-    if(data?.id) openThread(data.id, data.title);
+// スレ一覧表示
+async function loadThreads(){
+  const { data, error } = await db.from("threads").select("*").order("created_at",{ascending:false});
+  if(error){ console.error(error); return; }
+  threadBox.innerHTML="";
+  (data||[]).forEach(th=>{
+    const row=document.createElement("div");
+    row.className="thread-row";
+    row.textContent = escapeHTML(th.title);
+    const meta=document.createElement("span");
+    meta.className="thread-meta";
+    meta.textContent = fmt(th.created_at);
+    row.appendChild(meta);
+    row.onclick = ()=>openThread(th.id, th.title);
+    threadBox.appendChild(row);
   });
+}
 
-  async function openThread(id,title){
-    currentThreadId=id;
-    viewTitle.textContent=escapeHTML(title);
-    viewWrap.style.display="block";
-    document.getElementById("thread-view").scrollIntoView({behavior:"smooth",block:"start"});
-    await loadPosts();
-  }
+// スレ作成
+btnCreate.addEventListener("click", async ()=>{
+  const title = newTitle.value.trim();
+  if(!title){ alert("タイトルを入れて"); return; }
+  const { data, error } = await db.from("threads").insert([{ title }]).select().limit(1).maybeSingle();
+  if(error){ console.error(error); alert("スレ作成失敗"); return; }
+  newTitle.value="";
+  await loadThreads();
+  if(data?.id) openThread(data.id, data.title);
+});
 
-  async function loadPosts(){
-    if(!currentThreadId) return;
-    const { data, error } = await db.from("posts")
-      .select("id,content,created_at,thread_id")
-      .eq("thread_id",currentThreadId)
-      .order("created_at",{ascending:true});
-    if(error){ console.error(error); return; }
-    postsEl.innerHTML="";
-    (data||[]).forEach((p,i)=>{
-      const div=document.createElement("div");
-      div.className="post";
-      const content = escapeHTML(p.content||"");
-      const userIdMatch = content.match(/^\[([A-Z0-9]{4})\]\s*/);
-      const userId = userIdMatch ? userIdMatch[1] : '----';
-      const msg = userIdMatch ? content.replace(/^\[[A-Z0-9]{4}\]\s*/,'') : content;
-      div.textContent = `[${i+1}]：名無し：${fmt(p.created_at)} ID:[${userId}] ${msg}`;
-      postsEl.appendChild(div);
-    });
-    postsEl.scrollTop = postsEl.scrollHeight;
-  }
+// スレ詳細表示
+async function openThread(id,title){
+  currentThreadId=id;
+  viewTitle.textContent = escapeHTML(title);
+  viewWrap.style.display="block";
+  document.getElementById("thread-view").scrollIntoView({behavior:"smooth",block:"start"});
+  await loadPosts();
+}
 
-  btnSend.addEventListener("click", async ()=>{
-    const now = Date.now();
-    if(now - lastPostTime < 2000){ alert("連投は2秒空けてください"); return; }
-    if(!currentThreadId) return;
-    let content = inputMsg.value.trim();
-    if(!content) return;
-    if(content.length > 200){ alert("本文は200文字までです"); return; }
-    const userId = generateDailyId();
-    const { error } = await db.from("posts").insert([{ thread_id:currentThreadId, content:`[${userId}] ${content}` }]);
-    if(error){ console.error(error); alert("投稿失敗"); return; }
-    inputMsg.value = "";
-    lastPostTime = now;
-    await loadPosts();
+// レス表示
+async function loadPosts(){
+  if(!currentThreadId) return;
+  const { data, error } = await db.from("posts")
+    .select("id,content,created_at,thread_id")
+    .eq("thread_id",currentThreadId)
+    .order("created_at",{ascending:true});
+  if(error){ console.error(error); return; }
+  postsEl.innerHTML="";
+  (data||[]).forEach((p,i)=>{
+    const div=document.createElement("div");
+    div.className="post";
+    const content = escapeHTML(p.content||"");
+    const userIdMatch = content.match(/^\[([A-Z0-9]{4})\]\s*/);
+    const userId = userIdMatch ? userIdMatch[1] : '----';
+    const msg = userIdMatch ? content.replace(/^\[[A-Z0-9]{4}\]\s*/,'') : content;
+    div.textContent = `[${i+1}]：名無し：${fmt(p.created_at)} ID:[${userId}] ${msg}`;
+    postsEl.appendChild(div);
   });
+  postsEl.scrollTop = postsEl.scrollHeight;
+}
 
-  btnBack.addEventListener("click", ()=>{
-    currentThreadId = null;
-    viewWrap.style.display="none";
-    window.scrollTo({top:0,behavior:"smooth"});
-  });
+// 投稿
+btnSend.addEventListener("click", async ()=>{
+  const now = Date.now();
+  if(now - lastPostTime < 2000){ alert("連投は2秒空けてください"); return; }
+  if(!currentThreadId) return;
+  let content = inputMsg.value.trim();
+  if(!content) return;
+  if(content.length>200){ alert("本文は200文字まで"); return; }
+  const userId = generateDailyId();
+  const { error } = await db.from("posts").insert([{ thread_id:currentThreadId, content:`[${userId}] ${content}` }]);
+  if(error){ console.error(error); alert("投稿失敗"); return; }
+  inputMsg.value="";
+  lastPostTime = now;
+  await loadPosts();
+});
 
-  db.channel("rt-posts")
-    .on("postgres_changes",{event:"INSERT",schema:"public",table:"posts"},payload=>{
-      if(payload?.new?.thread_id===currentThreadId) loadPosts();
-    }).subscribe();
+// スレ一覧に戻る
+btnBack.addEventListener("click", ()=>{
+  currentThreadId = null;
+  viewWrap.style.display="none";
+  window.scrollTo({top:0,behavior:"smooth"});
+});
 
-  loadThreads();
+// リアルタイム更新
+db.channel("rt-posts")
+  .on("postgres_changes",{event:"INSERT",schema:"public",table:"posts"},payload=>{
+    if(payload?.new?.thread_id===currentThreadId) loadPosts();
+  }).subscribe();
+
+loadThreads();
 </script>
 </body>
 </html>
