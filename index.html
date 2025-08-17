@@ -5,34 +5,31 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>なんI</title>
 <style>
-/* ボタンだけスタイル（調整版） */
 button {
   width: 100%;
-  padding: 10px 0;          
-  font-size: 1em;           
-  font-weight: normal;      
+  padding: 10px 0;
+  font-size: 1em;
+  font-weight: normal;
   text-align: center;
   cursor: pointer;
   margin-top: 4px;
   border-radius: 4px;
   border: 1px solid #000;
-  color: #666666;           
-  background-color: #fff;   
+  color: #666666;
+  background-color: #fff;
 }
-
 .post {
-  border-bottom: 1px solid #666; 
-  margin: 6px 0;                 
-  padding: 4px 2px;              
+  border-bottom: 1px solid #666;
+  margin: 6px 0;
+  padding: 4px 2px;
 }
 .post-header {
   font-weight: bold;
 }
 .post-body {
   margin-left: 1em;
-  white-space: pre-wrap; 
+  white-space: pre-wrap;
 }
-
 .thread-first {
   margin-left: 1em;
   color: #444;
@@ -43,10 +40,15 @@ button {
 <body bgcolor="#FFFFFF" text="#000000">
 
 <div id="header" style="font-weight:bold; font-size:25px; margin:8px 0;">なんでも実況ジュピター</div>
-追加して欲しい要素・苦情は<a href="https://ngsesjdun.github.io/my-bbs/?thread=118#">ここ</a>
+<font size="2">追加して欲しい要素・苦情は運営ですというスレから
+<br>更新しなきゃいけないけどレスがあれば上がります</br>
+<!-- ページ全体を更新 -->
+<button type="submit">スレを更新</button>
+</form>
+</font>
+
 <hr>
 <div id="wrap">
-  <!-- スレ一覧 -->
   <div id="list-view">
     <div id="new-thread">
       <input id="thread-title-input" type="text" placeholder="スレッドタイトル" /><br>
@@ -55,41 +57,33 @@ button {
     </div>
     <div id="thread-box"></div>
   </div>
-
-  <!-- スレ詳細 -->
+<font size="2">
   <div id="thread-view" style="display:none; margin-top:8px;">
     <div id="thread-title" style="color:blue; font-weight:bold; margin-bottom:4px;"></div>
-
-    <!-- スレタイトル下のスレ一覧へボタン -->
     <button id="back-top" type="button">戻る</button>
-
+</font>
     <div id="posts"></div>
-
-    <!-- 投稿フォーム -->
     <div id="post-form-wrap" style="margin-top:8px;">
       <form id="post-form" onsubmit="return false;">
         <textarea id="post-message" placeholder="本文（改行できます）" rows="3" style="width:100%;"></textarea>
         <button id="send" type="button">投稿</button>
-        <!-- 投稿フォーム下のスレ一覧へボタン -->
-        <button id="back" type="button">← スレ一覧へ</button>
+        <button id="back" type="button">スレ一覧へ</button>
+<button id="back"type="submit">レス更新</button>
       </form>
     </div>
   </div>
 </div>
 
 <script type="module">
-// Supabase 初期化
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co";
 const SUPABASE = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8";
 const db = createClient(SUPABASE_URL, SUPABASE);
 
-// XSS対策
 function escapeHTML(str){
   return str.replace(/[&<>"']/g, s=>({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[s]));
 }
 
-// Discord風文字装飾
 function parseDecorations(str){
   str = escapeHTML(str);
   str = str.replace(/!fontcolor=([a-zA-Z#0-9]+)\s(.+?)(?=$|\n)/g, (_,c,text)=>`<span style="color:${c}">${text}</span>`);
@@ -100,7 +94,6 @@ function parseDecorations(str){
   return str;
 }
 
-// 要素取得
 const listView  = document.getElementById("list-view");
 const threadBox = document.getElementById("thread-box");
 const postsEl   = document.getElementById("posts");
@@ -140,42 +133,36 @@ function fmt(ts){
   return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}(${w}) ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-// スレ一覧読み込み（>>1同時取得版）
 async function loadThreads(){
   const { data, error } = await db
     .from("threads")
-    .select(`
-      id,
-      title,
-      posts!inner(
-        content,
-        created_at
-      )
-    `)
-    .order("created_at", { ascending: false });
-
+    .select(`id,title,created_at,posts(created_at,content)`);
   if(error){ console.error(error); return; }
 
-  threadBox.innerHTML = "";
-  for(const th of (data || [])){
+  data.sort((a,b)=>{
+    const aLast = a.posts.length>0 ? new Date(a.posts[a.posts.length-1].created_at) : new Date(a.created_at);
+    const bLast = b.posts.length>0 ? new Date(b.posts[b.posts.length-1].created_at) : new Date(b.created_at);
+    return bLast - aLast;
+  });
+
+  threadBox.innerHTML="";
+  for(const th of data){
     const row = document.createElement("div");
     row.style.border="1px solid #000";
     row.style.margin="2px 0";
     row.style.padding="4px";
 
-    // スレタイトルリンク
     const a = document.createElement("a");
     a.href="#";
     a.textContent = escapeHTML(th.title);
     a.addEventListener("click", ()=>openThread(th.id, th.title));
     row.appendChild(a);
 
-    // >>1本文
-    if(th.posts && th.posts.length > 0){
+    if(th.posts && th.posts.length>0){
       const firstPost = th.posts.sort((a,b)=> new Date(a.created_at)-new Date(b.created_at))[0];
       const div = document.createElement("div");
-      div.className = "thread-first";
-      div.innerHTML = parseDecorations(firstPost.content.replace(/^\[[A-Z0-9]{4}\]\s*/,''));
+      div.className="thread-first";
+      div.innerHTML=parseDecorations(firstPost.content.replace(/^\[[A-Z0-9]{4}\]\s*/,''));
       row.appendChild(div);
     }
 
@@ -183,7 +170,6 @@ async function loadThreads(){
   }
 }
 
-// スレ作成
 btnCreate.addEventListener("click", async ()=>{
   const title = newTitle.value.trim();
   const body  = newBody.value.trim();
@@ -198,22 +184,20 @@ btnCreate.addEventListener("click", async ()=>{
   const { error: postError } = await db.from("posts").insert([{ thread_id: threadId, content:`[${userId}] ${body}` }]);
   if(postError){ console.error(postError); alert("初回本文投稿失敗"); return; }
 
-  newTitle.value = "";
-  newBody.value = "";
+  newTitle.value="";
+  newBody.value="";
   await loadThreads();
   openThread(threadId, title);
 });
 
-// スレ詳細
 async function openThread(id,title){
   currentThreadId=id;
-  viewTitle.textContent = escapeHTML(title);
+  viewTitle.textContent=escapeHTML(title);
   listView.style.display="none";
   viewWrap.style.display="block";
   await loadPosts();
 }
 
-// 投稿一覧
 async function loadPosts(){
   if(!currentThreadId) return;
   const { data, error } = await db.from("posts")
@@ -221,10 +205,11 @@ async function loadPosts(){
     .eq("thread_id",currentThreadId)
     .order("created_at",{ascending:true});
   if(error){ console.error(error); return; }
+
   postsEl.innerHTML="";
   (data||[]).forEach((p,i)=>{
     const div = document.createElement("div");
-    div.className = "post";
+    div.className="post";
     const userIdMatch = p.content.match(/^\[([A-Z0-9]{4})\]\s*/);
     const userId = userIdMatch ? userIdMatch[1] : '----';
     const msg = userIdMatch ? p.content.replace(/^\[[A-Z0-9]{4}\]\s*/,'') : p.content;
@@ -247,7 +232,6 @@ async function loadPosts(){
   });
 }
 
-// 投稿送信
 btnSend.addEventListener("click", async ()=>{
   const now = Date.now();
   if(now - lastPostTime < 2000){ alert("連投は2秒空けてください"); return; }
@@ -263,7 +247,6 @@ btnSend.addEventListener("click", async ()=>{
   await loadPosts();
 });
 
-// 戻る
 btnBack.addEventListener("click", ()=>{
   currentThreadId=null;
   viewWrap.style.display="none";
@@ -275,7 +258,16 @@ btnBackTop.addEventListener("click", ()=>{
   listView.style.display="block";
 });
 
-// 初期読み込み
+// Realtime subscription
+db.channel('public:posts')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, payload => {
+    if(currentThreadId && payload.new.thread_id === currentThreadId){
+      loadPosts();
+    }
+    loadThreads();
+  })
+  .subscribe();
+
 loadThreads();
 </script>
 </body>
