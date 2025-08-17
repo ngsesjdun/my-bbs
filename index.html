@@ -5,39 +5,46 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>なんI</title>
 <style>
-/* ボタンだけスタイル */
+/* ボタンだけスタイル（調整版） */
 button {
   width: 100%;
-  padding: 14px 0;
-  font-size: 1.3em;
-  font-weight: bold;
+  padding: 10px 0;          
+  font-size: 1em;           
+  font-weight: normal;      
   text-align: center;
   cursor: pointer;
   margin-top: 4px;
   border-radius: 4px;
   border: 1px solid #000;
+  color: #666666;           
+  background-color: #fff;   
 }
 
 .post {
-  border-bottom: 1px solid #666; /* 区切り線 */
-  margin: 6px 0;                 /* 上下の余白 */
-  padding: 4px 2px;              /* 内側の余白 */
+  border-bottom: 1px solid #666; 
+  margin: 6px 0;                 
+  padding: 4px 2px;              
 }
 .post-header {
   font-weight: bold;
 }
 .post-body {
   margin-left: 1em;
-  white-space: pre-wrap; /* 改行を保持 */
+  white-space: pre-wrap; 
 }
 
+.thread-first {
+  margin-left: 1em;
+  color: #444;
+  font-size: 0.9em;
+}
 </style>
 </head>
-<body bgcolor="#EFEFEF" text="#000000">
+<body bgcolor="#FFFFFF" text="#000000">
 
-<div id="header" style="font-weight:bold; font-size:20px; margin:8px 0;">なんでも実況ジュピター</div>
-追加して欲しい要素・苦情は<>
-
+<div id="header" style="font-weight:bold; font-size:25px; margin:8px 0;">なんでも実況ジュピター</div>
+追加して欲しい要素・苦情は<a href="https://ngsesjdun.github.io/my-bbs/?thread=118#">ここ</a>
+<hr>
 <div id="wrap">
   <!-- スレ一覧 -->
   <div id="list-view">
@@ -62,7 +69,7 @@ button {
     <div id="post-form-wrap" style="margin-top:8px;">
       <form id="post-form" onsubmit="return false;">
         <textarea id="post-message" placeholder="本文（改行できます）" rows="3" style="width:100%;"></textarea>
-        <button id="send" type="button">書き込む</button>
+        <button id="send" type="button">投稿</button>
         <!-- 投稿フォーム下のスレ一覧へボタン -->
         <button id="back" type="button">← スレ一覧へ</button>
       </form>
@@ -74,7 +81,7 @@ button {
 // Supabase 初期化
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co";
-const SUPABASE = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8"; // 文字化け対策な
+const SUPABASE = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8";
 const db = createClient(SUPABASE_URL, SUPABASE);
 
 // XSS対策
@@ -133,23 +140,45 @@ function fmt(ts){
   return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}(${w}) ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-// スレ一覧読み込み
+// スレ一覧読み込み（>>1同時取得版）
 async function loadThreads(){
-  const { data, error } = await db.from("threads").select("*").order("created_at",{ascending:false});
+  const { data, error } = await db
+    .from("threads")
+    .select(`
+      id,
+      title,
+      posts!inner(
+        content,
+        created_at
+      )
+    `)
+    .order("created_at", { ascending: false });
+
   if(error){ console.error(error); return; }
-  threadBox.innerHTML="";
-  for(const th of (data||[])){
+
+  threadBox.innerHTML = "";
+  for(const th of (data || [])){
     const row = document.createElement("div");
     row.style.border="1px solid #000";
     row.style.margin="2px 0";
     row.style.padding="4px";
 
+    // スレタイトルリンク
     const a = document.createElement("a");
     a.href="#";
     a.textContent = escapeHTML(th.title);
-    a.addEventListener("click",()=>openThread(th.id, th.title));
-
+    a.addEventListener("click", ()=>openThread(th.id, th.title));
     row.appendChild(a);
+
+    // >>1本文
+    if(th.posts && th.posts.length > 0){
+      const firstPost = th.posts.sort((a,b)=> new Date(a.created_at)-new Date(b.created_at))[0];
+      const div = document.createElement("div");
+      div.className = "thread-first";
+      div.innerHTML = parseDecorations(firstPost.content.replace(/^\[[A-Z0-9]{4}\]\s*/,''));
+      row.appendChild(div);
+    }
+
     threadBox.appendChild(row);
   }
 }
@@ -195,13 +224,12 @@ async function loadPosts(){
   postsEl.innerHTML="";
   (data||[]).forEach((p,i)=>{
     const div = document.createElement("div");
-div.className = "post";
+    div.className = "post";
     const userIdMatch = p.content.match(/^\[([A-Z0-9]{4})\]\s*/);
     const userId = userIdMatch ? userIdMatch[1] : '----';
     const msg = userIdMatch ? p.content.replace(/^\[[A-Z0-9]{4}\]\s*/,'') : p.content;
 
-const header = document.createElement("div");
-
+    const header = document.createElement("div");
     const nameSpan = document.createElement("span");
     nameSpan.style.color="green";
     nameSpan.textContent="名無し";
