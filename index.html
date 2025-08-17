@@ -99,7 +99,13 @@
   }
   generateDailyId();
 
-  const fmt = (ts) => ts ? new Date(ts + "Z").toLocaleString("ja-JP",{hour12:false}) : "";
+  // 時間表示（ミリ秒付き）
+  const fmt = (ts) => {
+    if(!ts) return "";
+    const d = new Date(ts + "Z");
+    const pad = (n,l=2)=>String(n).padStart(l,"0");
+    return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3,"0")}`;
+  }
 
   async function loadThreads(){
     const { data, error } = await db.from("threads").select("*").order("created_at", { ascending:false });
@@ -150,10 +156,27 @@
     (data||[]).forEach((p,i)=>{
       const div = document.createElement("div");
       div.className="post";
-      div.innerHTML = `<span class="no">${i+1}</span> ${p.content || ""}<br><span class="time">${fmt(p.created_at)}</span>`;
+
+      // XSS対策: textContentで安全に表示
+      const no = document.createElement("span");
+      no.className="no";
+      no.textContent = i+1;
+      const content = document.createElement("span");
+      content.textContent = p.content || "";
+      const time = document.createElement("span");
+      time.className="time";
+      time.textContent = fmt(p.created_at);
+
+      div.appendChild(no);
+      div.appendChild(document.createTextNode(" "));
+      div.appendChild(content);
+      div.appendChild(document.createElement("br"));
+      div.appendChild(time);
+
       postsEl.appendChild(div);
     });
-    postsEl.scrollTop = postsEl.scrollHeight;
+    // スクロールを一番上に
+    postsEl.scrollTop = 0;
   }
 
   // 投稿（連投2秒＋200文字制限＋0時ID）
@@ -179,6 +202,7 @@
     window.scrollTo({top:0, behavior:"smooth"});
   });
 
+  // リアルタイム反映
   db.channel("rt-posts")
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"posts"}, payload=>{
       if(payload?.new?.thread_id === currentThreadId) loadPosts();
