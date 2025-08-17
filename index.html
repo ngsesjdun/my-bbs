@@ -25,10 +25,16 @@
     <div id="posts"></div>
     <div id="post-form-wrap" style="margin-top:4px;">
       <form id="post-form" onsubmit="return false;">
-        <input id="post-message" type="text" placeholder="本文" />
-        <button id="send" type="button">書き込む</button>
+        <!-- 本文入力を textarea に変更 -->
+        <textarea id="post-message" placeholder="本文（改行できます）" rows="3" style="width:100%;"></textarea>
+        <div style="margin-top:4px; display:flex; justify-content:space-between;">
+
+          
+          
+          <button id="send" type="button">書き込む</button>
+<br><button id="back" type="button">← スレ一覧へ</button>
+        </div>
       </form>
-      <button id="back" type="button">← スレ一覧へ</button>
     </div>
   </div>
 </div>
@@ -89,7 +95,7 @@ async function loadThreads(){
     row.style.padding = "4px";
 
     const a = document.createElement("a");
-    a.href = "?thread="+th.id; // ← URLにスレIDを付ける
+    a.href = "?thread="+th.id;
     a.style.color = "blue";
     a.style.textDecoration = "none";
     a.textContent = th.title;
@@ -124,7 +130,7 @@ async function openThread(id,title){
   viewTitle.textContent = title;
   listView.style.display="none";
   viewWrap.style.display="block";
-  history.replaceState(null,"",`?thread=${id}`); // ← URLを固定化
+  history.replaceState(null,"",`?thread=${id}`);
   await loadPosts();
 }
 
@@ -147,7 +153,7 @@ async function loadPosts(){
     const userId = userIdMatch ? userIdMatch[1] : '----';
     const msg = userIdMatch ? p.content.replace(/^\[[A-Z0-9]{4}\]\s*/,'') : p.content;
 
-    // ヘッダ（番号・名前・日時・ID）
+    // ヘッダ
     const header = document.createElement("div");
     const nameSpan = document.createElement("span");
     nameSpan.style.color = "green";
@@ -156,9 +162,9 @@ async function loadPosts(){
     header.appendChild(nameSpan);
     header.appendChild(document.createTextNode(`：${fmt(p.created_at)} ID:${userId}`));
 
-    // 本文は改行して表示
+    // 本文（改行対応）
     const body = document.createElement("div");
-    body.textContent = msg;
+    body.innerHTML = msg.replace(/\n/g,"<br>");
     body.style.marginLeft = "1em";
 
     div.appendChild(header);
@@ -174,7 +180,7 @@ btnSend.addEventListener("click", async ()=>{
   if(!currentThreadId) return;
   let content = inputMsg.value.trim();
   if(!content) return;
-  if(content.length > 200){ alert("本文は200文字までです"); return; }
+  if(content.length > 2000){ alert("本文は2000文字までです"); return; }
   const userId = generateDailyId();
   const { error } = await db.from("posts").insert([{ thread_id:currentThreadId, content:`[${userId}] ${content}` }]);
   if(error){ console.error(error); alert("投稿失敗"); return; }
@@ -188,7 +194,7 @@ btnBack.addEventListener("click", ()=>{
   currentThreadId = null;
   viewWrap.style.display="none";
   listView.style.display="block";
-  history.replaceState(null,"","./"); // URLを元に戻す
+  history.replaceState(null,"","./");
 });
 
 // リアルタイム
@@ -199,11 +205,10 @@ db.channel("rt-posts")
 
 loadThreads();
 
-// ページ直アクセス対応
+// 直リンク対応
 const urlParams = new URLSearchParams(window.location.search);
 const threadId = urlParams.get("thread");
 if(threadId){
-  // DBからタイトルを取って開く
   db.from("threads").select("title").eq("id",threadId).maybeSingle()
     .then(res=>{
       if(res.data) openThread(threadId,res.data.title);
