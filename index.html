@@ -35,61 +35,56 @@ button {
   color: #444;
   font-size: 0.9em;
 }
+#thread-title {
+  color: blue;
+  font-weight: bold;
+  font-size: 27px; /* 大きめ */
+  margin-bottom: 4px;
+}
 </style>
 </head>
 <body bgcolor="#FFFFFF" text="#000000">
 
 <div id="header" style="font-weight:bold; font-size:25px; margin:8px 0;">なんでも実況ジュピター</div>
 <font size="2">追加して欲しい要素・苦情は運営ですというスレから<br>更新しなきゃいけないけどレスがあれば上がります</font>
+<br><font size="2">18:43 フォントサイズなスレ詳細リンク化、スレ開いた時のスレタイトルを大きく、戻る、スレ一覧へのボタンが正常に機能しないバグ修正</font>
 <hr>
 
 <div id="wrap">
   <div id="list-view">
-    
-
     <div id="new-thread">
       <input id="thread-title-input" type="text" placeholder="スレッドタイトル" /><br>
       <textarea id="thread-body-input" placeholder="本文（最初のレス）" rows="2" style="width:100%;"></textarea>
       <button id="create-thread" type="button">スレ作成</button>
     </div>
     <font size="2">
-    <!-- スレ一覧更新ボタン -->
-    <button id="refresh-threads" style="color:#fff; background-color:#0077ff; ">スレを更新</button>
+      <button id="refresh-threads" style="color:#fff; background-color:#0077ff; ">スレを更新</button>
     </font>
     <div id="thread-box"></div>
   </div>
 
   <div id="thread-view" style="display:none; margin-top:8px;">
-    <!-- スレ詳細タイトル -->
-    <div id="thread-title" style="color:blue; font-weight:bold; margin-bottom:4px;"></div>
-    <!-- スレ詳細戻るボタン -->
+    <div id="thread-title"></div>
     <button id="back-top" type="button">戻る</button>
-    <!-- レス更新ボタン -->
-
-
     <div id="posts"></div>
-
     <div id="post-form-wrap" style="margin-top:8px;">
-  <form id="post-form" onsubmit="return false;">
-    <textarea id="post-message" placeholder="本文（改行できます）" rows="3" style="width:100%;"></textarea>
-    <button id="send" type="button">投稿</button>
-    <button id="back" type="button" style="background-color:#fff;">スレ一覧へ</button>
-    <!-- レス更新ボタンをここに配置 -->
-    <button id="refresh-posts" type="button" style="color:#fff; background-color:blue; ">レス更新</button>
-  </form>
-</div>
-
-
+      <form id="post-form" onsubmit="return false;">
+        <textarea id="post-message" placeholder="本文（改行できます）" rows="3" style="width:100%;"></textarea>
+        <button id="send" type="button">投稿</button>
+        <button id="back" type="button" style="background-color:#fff;">スレ一覧へ</button>
+        <button id="refresh-posts" type="button" style="color:#fff; background-color:blue; ">レス更新</button>
+      </form>
+    </div>
   </div>
 </div>
 
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 const SUPABASE_URL = "https://owopzgeliyhgxpnywscy.supabase.co";
-const SUPABASE = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8"
-const db = createClient(SUPABASE_URL, SUPABASE);
+const MOZI = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93b3B6Z2VsaXloZ3hwbnl3c2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjU3MTYsImV4cCI6MjA3MDY0MTcxNn0.0zUkNS8KeXULcl7HxoYQvbD7J0FTf3Z9-4Xq4rpDdX8"; 
+const db = createClient(SUPABASE_URL, MOZI); //MoZIは文字化け対策、URLだけでいい
 
-// --- XSS対策と装飾関数 ---
+// --- XSS対策と装飾 ---
 function escapeHTML(str){return str.replace(/[&<>"']/g,s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[s]));}
 function parseDecorations(str){
   str=escapeHTML(str);
@@ -156,18 +151,27 @@ async function loadThreads(){
     const row=document.createElement("div");
     row.style.border="1px solid #000"; row.style.margin="2px 0"; row.style.padding="4px";
 
-    const a=document.createElement("a"); a.href="#"; a.textContent=escapeHTML(th.title);
-    a.addEventListener("click",()=>openThread(th.id,th.title));
+    const a=document.createElement("a"); 
+    a.href=`?thread=${th.id}`;
+    a.textContent=escapeHTML(th.title)+` (レス数:${th.posts.length})`;
+    a.addEventListener("click",(e)=>{e.preventDefault(); openThread(th.id,th.title);});
     row.appendChild(a);
 
     if(th.posts && th.posts.length>0){
       const firstPost=th.posts.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at))[0];
       const div=document.createElement("div"); div.className="thread-first";
-      div.innerHTML=parseDecorations(firstPost.content.replace(/^\[[A-Z0-9]{4}\]\s*/,''));
+
+      let content = firstPost.content.replace(/^\[[A-Z0-9]{4}\]\s*/,'');
+      const halfLen = Math.ceil(content.length/2);
+      content = content.slice(0, Math.min(halfLen, 150)) + (content.length > 150 ? "…" : "");
+
+      div.innerHTML=parseDecorations(content);
       row.appendChild(div);
     }
     threadBox.appendChild(row);
   }
+
+  if(currentThreadId) viewWrap.style.display="block"; else listView.style.display="block";
 }
 
 // --- スレ作成 ---
@@ -194,6 +198,7 @@ btnCreate.addEventListener("click", async ()=>{
 async function openThread(id,title){
   currentThreadId=id;
   viewTitle.textContent=escapeHTML(title);
+  history.replaceState(null,null,`?thread=${id}`);
   listView.style.display="none";
   viewWrap.style.display="block";
   await loadPosts();
@@ -234,7 +239,7 @@ btnSend.addEventListener("click", async ()=>{
   if(!currentThreadId) return;
   let content=inputMsg.value.trim();
   if(!content) return;
-  if(content.length>2000){ alert("本文は2000文字までです"); return; }
+  if(content.length>200){ alert("本文は200文字までです"); return; }
   const userId=generateDailyId();
   const { error }=await db.from("posts").insert([{ thread_id:currentThreadId, content:`[${userId}] ${content}` }]);
   if(error){ console.error(error); alert("投稿失敗"); return; }
@@ -243,10 +248,10 @@ btnSend.addEventListener("click", async ()=>{
 
 // --- 戻る ---
 btnBack.addEventListener("click",()=>{
-  currentThreadId=null; viewWrap.style.display="none"; listView.style.display="block";
+  window.location.href = "https://ngsesjdun.github.io/my-bbs";
 });
 btnBackTop.addEventListener("click",()=>{
-  currentThreadId=null; viewWrap.style.display="none"; listView.style.display="block";
+  window.location.href = "https://ngsesjdun.github.io/my-bbs";
 });
 
 // --- 更新ボタン ---
@@ -261,6 +266,16 @@ db.channel('public:posts')
   }).subscribe();
 
 loadThreads();
+
+// --- ページロード時にクエリチェック ---
+const params=new URLSearchParams(location.search);
+if(params.has("thread")){
+  const id=params.get("thread");
+  (async()=>{
+    const { data,error }=await db.from("threads").select("id,title").eq("id",id).maybeSingle();
+    if(data) openThread(data.id,data.title);
+  })();
+}
 </script>
 </body>
 </html>
