@@ -160,7 +160,7 @@ async function loadThreads(){
       const firstPost=th.posts.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at))[0];
       const div=document.createElement("div"); div.className="thread-first";
 
-      let content = firstPost.content.replace(/^\[[A-Z0-9]{35}\]\s*/,'');
+      let content = firstPost.content.replace(/^\[[A-Z0-9]{4}\]\s*/,'');
       const halfLen = Math.ceil(content.length/2);
       content = content.slice(0, Math.min(halfLen, 35)) + (content.length > 35 ? "…" : "");
 
