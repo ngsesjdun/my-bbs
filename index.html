@@ -47,7 +47,6 @@ button {
 
 <div id="header" style="font-weight:bold; font-size:25px; margin:8px 0;">なんでも実況ジュピター</div>
 <font size="2">追加して欲しい要素・苦情は運営ですというスレから<br>更新しなきゃいけないけどレスがあれば上がります</font>
-<br><font size="2">18:43 フォントサイズなスレ詳細リンク化、スレ開いた時のスレタイトルを大きく、戻る、スレ一覧へのボタンが正常に機能しないバグ修正</font>
 <hr>
 
 <div id="wrap">
@@ -153,7 +152,7 @@ async function loadThreads(){
 
     const a=document.createElement("a"); 
     a.href=`?thread=${th.id}`;
-    a.textContent=escapeHTML(th.title)+` (レス数:${th.posts.length})`;
+    a.textContent=escapeHTML(th.title)+` (${th.posts.length})`;
     a.addEventListener("click",(e)=>{e.preventDefault(); openThread(th.id,th.title);});
     row.appendChild(a);
 
