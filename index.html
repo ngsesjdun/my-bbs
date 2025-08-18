@@ -46,7 +46,7 @@ button {
 <body bgcolor="#FFFFFF" text="#000000">
 
 <div id="header" style="font-weight:bold; font-size:25px; margin:8px 0;">なんでも実況ジュピター</div>
-<font size="2">追加して欲しい要素・苦情は運営ですというスレから<br>更新しなきゃいけないけどレスがあれば上がります</font>
+<font size="2">追加して欲しい要素・苦情は運営です<a href="https://ngsesjdun.github.io/my-bbs/?thread=102"ここ</a><br>更新しなきゃいけないけどレスがあれば上がります</font>
 <hr>
 
 <div id="wrap">
@@ -160,7 +160,7 @@ async function loadThreads(){
       const firstPost=th.posts.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at))[0];
       const div=document.createElement("div"); div.className="thread-first";
 
-      let content = firstPost.content.replace(/^\[[A-Z0-9]{4}\]\s*/,'');
+      let content = firstPost.content.replace(/^\[[A-Z0-9]{35}\]\s*/,'');
       const halfLen = Math.ceil(content.length/2);
       content = content.slice(0, Math.min(halfLen, 35)) + (content.length > 35 ? "…" : "");
 
