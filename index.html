@@ -162,7 +162,7 @@ async function loadThreads(){
 
       let content = firstPost.content.replace(/^\[[A-Z0-9]{4}\]\s*/,'');
       const halfLen = Math.ceil(content.length/2);
-      content = content.slice(0, Math.min(halfLen, 150)) + (content.length > 150 ? "…" : "");
+      content = content.slice(0, Math.min(halfLen, 35)) + (content.length > 35 ? "…" : "");
 
       div.innerHTML=parseDecorations(content);
       row.appendChild(div);
