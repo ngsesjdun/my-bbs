@@ -18,6 +18,7 @@ button {
   color: #666666;
   background-color: #fff;
 }
+input, textarea { margin-bottom: 4px; }
 .post {
   border-bottom: 1px solid #666;
   margin: 6px 0;
@@ -36,7 +37,8 @@ button {
 <div id="wrap">
   <div id="list-view">
     <div id="new-thread">
-      <input id="thread-title-input" type="text" placeholder="スレッドタイトル" /><br>
+      <input id="thread-name-input" type="text" placeholder="名前（省略可）" style="width:100%;"><br>
+      <input id="thread-title-input" type="text" placeholder="スレッドタイトル" style="width:100%;"><br>
       <textarea id="thread-body-input" placeholder="本文（最初のレス）" rows="2" style="width:100%;"></textarea>
       <button id="create-thread" type="button">スレ作成</button>
     </div>
@@ -51,6 +53,7 @@ button {
     <div id="posts"></div>
     <div id="post-form-wrap" style="margin-top:8px;">
       <form id="post-form" onsubmit="return false;">
+        <input id="post-name" type="text" placeholder="名前（省略可）" style="width:100%;"><br>
         <textarea id="post-message" placeholder="本文（改行できます）" rows="3" style="width:100%;"></textarea>
         <button id="send" type="button">投稿</button>
         <button id="back" type="button" style="background-color:#fff;">スレ一覧へ</button>
@@ -60,9 +63,12 @@ button {
   </div>
 </div>
 
-<script src="script.js"type="module" >
-
-
+<script src=999.js>
+</script>
+<css src=ponpon>
+</script>
+<script src="CSS.js"type="module">
 </script>
 </body>
 </html>
+
