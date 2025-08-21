@@ -5,41 +5,29 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>なんI</title>
 <style>
-button {
-  width: 100%;
-  padding: 10px 0;
-  font-size: 1em;
-  font-weight: normal;
-  text-align: center;
-  cursor: pointer;
-  margin-top: 4px;
-  border-radius: 4px;
-  border: 1px solid #000;
-  color: #666666;
-  background-color: #fff;
-}
-input, textarea { margin-bottom: 4px; }
-.post {
-  border-bottom: 1px solid #666;
-  margin: 6px 0;
-  padding: 4px 2px;
-}
-.post-header { font-weight: bold; }
-.post-body { margin-left: 1em; white-space: pre-wrap; }
-.thread-first { margin-left: 1em; color: #444; font-size: 0.9em; }
-#thread-title { color: blue; font-weight: bold; font-size: 27px; margin-bottom: 4px; }
+button { width:100%; padding:10px 0; font-size:1em; font-weight:normal; text-align:center; cursor:pointer; margin-top:4px; border-radius:4px; border:1px solid #000; color:#666666; background-color:#fff; }
+input, textarea { margin-bottom:4px; }
+.post { border-bottom:1px solid #666; margin:6px 0; padding:4px 2px; }
+.post-header { font-weight:normal; }
+.post-body { margin-left:1em; white-space:pre-wrap; }
+.thread-first { margin-left:1em; color:#444; font-size:0.9em; }
+#thread-title { color:blue; font-weight:bold; font-size:27px; margin-bottom:4px; }
+#header { font-weight:bold; font-size:25px; margin:8px 0; }
+.res-link { color:blue; text-decoration:underline; cursor:pointer; }
+.res-anchor { scroll-margin-top:50px; }
+.name-nanashi { color: green; }
 </style>
 </head>
 <body bgcolor="#FFFFFF" text="#000000">
-<div id="header" style="font-weight:bold; font-size:25px; margin:8px 0;">なんでも実況ジュピター</div>
+<div id="header">なんでも実況ジュピター</div>
 <font size="2">追加して欲しい要素・苦情は運営ですと言うスレから<br>更新しなきゃいけないけどレスがあれば上がります</font>
 <hr>
 <div id="wrap">
   <div id="list-view">
     <div id="new-thread">
-      <input id="thread-name-input" type="text" placeholder="名前（省略可）" style="width:100%;"><br>
-      <input id="thread-title-input" type="text" placeholder="スレッドタイトル" style="width:100%;"><br>
-      <textarea id="thread-body-input" placeholder="本文（最初のレス）" rows="2" style="width:100%;"></textarea>
+      <input id="thread-name-input" type="text" placeholder="名前（省略可 / コテハンは 名前#pass）" style="width:100%;" maxlength="40"><br>
+      <input id="thread-title-input" type="text" placeholder="スレッドタイトル" style="width:100%;" maxlength="80"><br>
+      <textarea id="thread-body-input" placeholder="本文（最初のレス）" rows="2" style="width:100%;" maxlength="200"></textarea>
       <button id="create-thread" type="button">スレ作成</button>
     </div>
     <font size="2">
@@ -47,14 +35,15 @@ input, textarea { margin-bottom: 4px; }
     </font>
     <div id="thread-box"></div>
   </div>
+
   <div id="thread-view" style="display:none; margin-top:8px;">
     <div id="thread-title"></div>
     <button id="back-top" type="button">戻る</button>
     <div id="posts"></div>
     <div id="post-form-wrap" style="margin-top:8px;">
       <form id="post-form" onsubmit="return false;">
-        <input id="post-name" type="text" placeholder="名前（省略可）" style="width:100%;"><br>
-        <textarea id="post-message" placeholder="本文（改行できます）" rows="3" style="width:100%;"></textarea>
+        <input id="post-name" type="text" placeholder="名前（省略可 / コテハンは 名前#pass）" style="width:100%;" maxlength="40"><br>
+        <textarea id="post-message" placeholder="本文（改行できます）" rows="3" style="width:100%;" maxlength="200"></textarea>
         <button id="send" type="button">投稿</button>
         <button id="back" type="button" style="background-color:#fff;">スレ一覧へ</button>
         <button id="refresh-posts" type="button" style="color:#fff; background-color:blue;">レス更新</button>
